@@ -1,17 +1,22 @@
-import csv
+from pandas import DataFrame, concat
+from numpy.random import randint
 
-with open('file.csv', mode='w') as f:
-    fieldnames = ['emp_name', 'dept', 'birth_month']
-    writer = csv.writer(f, delimiter=',', quotechar='"', fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
+# title = "test"
+#
+# df = DataFrame(data=[[1, 2, 3]], columns=['date', 'start_time', 'end_time'])
+# concat([df, DataFrame(data=[[2, 2, 3]], columns=['date', 'start_time', 'end_time'])])
+# print(df)
+# #
+# #
+# # df = DataFrame(columns=["date", "start_time", "end_time"])
+# #
+# # dfAdding = DataFrame([["1/1/2020", 1, 2], ["2/1/2020", 2, 3]], columns=["date", "start_time", "end_time"])
+# # df.append(dfAdding)
+# #
+# df.to_csv("%s.csv" % title, index=False, sep=";", na_rep="---")
 
-    writer.writeheader()
-    writer.writerows([['John Smith', 'Accounting', 'November'], ['Erica Meyers', 'IT', 'March']])
+import pandas
 
-# import pandas
-# open("data.csv", mode="w")
-# df = pandas.read_csv('data.csv',
-#             index_col='Employee',
-#             parse_dates=['Hired'],
-#             header=0,
-#             names=['Employee', 'Hired', 'Salary', 'Sick Days'])
-# df.to_csv('hrdata_modified.csv')
+df = pandas.DataFrame(columns=["A"])
+
+print(df)

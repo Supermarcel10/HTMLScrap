@@ -20,11 +20,26 @@ from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
 
 backend = default_backend()
 iterations = 100_000
-cryptab = True
+monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+monthsLong = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
+
+# Setting this value will determine if you use Linux crontab for running your task.
+#           True - Disables while loop for grabbing data every set time
+#           False - Enables while loop, that will grab data every set time
+crontab = True
+
+# Setting these values determine the *.csv file titles (names), which can then be imported elsewhere such as a website.
+titles = {
+    "extranet.barnetsouthgate.ac.uk": "college",
+    "memployees.sportsdirectservices.com.txt": "work"
+}
+
+# Setting the key to a value will read the key and use it for decryption.
+# If a key is not specified, a key will be asked on every startup.
+# WARNING: SETTING A PERMANENT KEY MAY BE A SAFETY VULNERABILITY!
 key = ""
-if len(key) < 1:
-    key = str(input("Key: "))
+
 
 
 def console_log(message: str = None, mode: str = "info"):
@@ -204,36 +219,91 @@ def authenticate(url: str, username: str):
         console_log('Login information for user "%s" on website %s may be incorrect!' % (username, url), "warn")
 
 
+def shortToLongDayName(original):
+    if original == "mon":
+        return "Monday"
+    elif original == "tue":
+        return "Tuesday"
+    elif original == "wed":
+        return "Wednesday"
+    elif original == "thu":
+        return "Thursday"
+    elif original == "fri":
+        return "Friday"
+    elif original == "sat":
+        return "Saturday"
+    elif original == "sun":
+        return "Sunday"
+
+
+def longToShortDayName(original):
+    if original == "monday":
+        return "Mon"
+    elif original == "tuesday":
+        return "Tue"
+    elif original == "wednesday":
+        return "Wed"
+    elif original == "thursday":
+        return "Thu"
+    elif original == "friday":
+        return "Fri"
+    elif original == "saturday":
+        return "Sat"
+    elif original == "sunday":
+        return "Sun"
+
+
 def execute():
-    # ping("https://memployees.sportsdirectservices.com/Working-Hours")
-    # if locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
-    #     try:
-    #         console_log("Pulling data...")
-    #         week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text
-    #         weekdays = {}
-    #
-    #         for i in range(0, 7):
-    #             weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-    #                 [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-    #                  driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
-    #
-    #         console_log("Successfully pulled data!")
-    #
-    #         print(week, weekdays)
-    #     except:
-    #         console_log("Failed whilst pulling data!", "warn")
+    ping("https://memployees.sportsdirectservices.com/Working-Hours")
+    if locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
+        try:
+            console_log("Pulling data...")
+            _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
+            if week.endswith(")"): week = week[:-1]
+            week = week.split(" ", 3)
+
+            weekdays = {}
+
+
+            for i in range(0, 7):
+                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                     driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+
+            print(week, weekdays)
+
+
+            _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
+            if week.endswith(")"): week = week[:-1]
+            week = week.split(" ", 3)
+
+            weekdays = {}
+
+            for i in range(0, 7):
+                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                     driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+
+            print(week, weekdays)
+            console_log("Successfully pulled data!")
+        except:
+            console_log("Failed whilst pulling data!", "warn")
+
 
 
     ping("https://extranet.barnetsouthgate.ac.uk/", False)
     if locate_login("https://extranet.barnetsouthgate.ac.uk/"):
         weekdays = driver.find_elements_by_class_name("ttablegroup")
+        combined = {}
+        days = []
+
         for i in range(len(weekdays) - 1):
+            hours = []
+
             if weekdays[i].text.split("\n")[0].lower() in ("mon", "tue", "wed", "thu", "fri"):
-                print(weekdays[i].text.split("\n")[0])
+                days.append(shortToLongDayName(weekdays[i].text.split("\n")[0].lower()))
 
             columns = weekdays[i].find_elements_by_tag_name("td")
-
-            days = []
 
             for x in range(len(columns)):
                 if columns[x].get_attribute("colspan"):
@@ -247,15 +317,22 @@ def execute():
                     end_time = start_time + timedelta(minutes=length)
 
                     new_starting_time = end_time + timedelta(minutes=15)
-                    days.append([start_time, end_time])
+                    hours.append([str(start_time), str(end_time)])
+
+            combined[days[i]] = hours
 
             try:
                 del new_starting_time
             except:
                 pass
+
+        print(combined)
     else:
         driver.quit()
 
+
+if len(key) < 1:
+    key = str(input("Key: "))
 
 console_log('Running selentium version: "%s".' % webdriver.__version__)
 
@@ -290,7 +367,7 @@ except:
 if __name__ == "__main__":
     execute()
 
-    while not cryptab:
+    while not crontab:
         if (datetime.now().minute == 0) and (datetime.now().second == 0):
             execute()
         else:
