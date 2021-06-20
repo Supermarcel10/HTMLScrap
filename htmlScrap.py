@@ -13,8 +13,7 @@ from os import path, getcwd
 
 from sty import fg
 from time import sleep
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from secrets import token_bytes
 from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
 
@@ -373,7 +372,6 @@ if __name__ == "__main__":
         else:
             sleep(1)
 
-# year, week_num, day_of_week = datetime.today().isocalendar()
 # driver.find_element()
 driver.quit()
 console_log("Finished")

@@ -1,22 +1,28 @@
-from pandas import DataFrame, concat
-from numpy.random import randint
-
+from pandas import DataFrame
+from datetime import datetime, timedelta
+from math import ceil as math_ceil
+#
+#
 # title = "test"
 #
-# df = DataFrame(data=[[1, 2, 3]], columns=['date', 'start_time', 'end_time'])
-# concat([df, DataFrame(data=[[2, 2, 3]], columns=['date', 'start_time', 'end_time'])])
-# print(df)
-# #
-# #
-# # df = DataFrame(columns=["date", "start_time", "end_time"])
-# #
-# # dfAdding = DataFrame([["1/1/2020", 1, 2], ["2/1/2020", 2, 3]], columns=["date", "start_time", "end_time"])
-# # df.append(dfAdding)
-# #
+# df = DataFrame(columns=["title", "date", "start_time", "end_time"])
+#
+# df = df.append(DataFrame([["test", datetime.today(), datetime.now(), datetime.now() + timedelta(hours=2)]], columns=["title", "date", "start_time", "end_time"]), ignore_index=True)
+#
 # df.to_csv("%s.csv" % title, index=False, sep=";", na_rep="---")
 
-import pandas
+PreviousWeeks = 8
 
-df = pandas.DataFrame(columns=["A"])
+Year, WeekYear, DayWeek = datetime.today().isocalendar()
+YearDiff = math_ceil(PreviousWeeks / 52)
 
-print(df)
+if YearDiff > 0:
+    Year -= YearDiff
+    WeekYear = (52 * YearDiff) + WeekYear - PreviousWeeks
+    if WeekYear > 52:
+        Year += 1
+        WeekYear -= 52
+
+del YearDiff
+
+print(datetime.strptime('%s %s %s' % (Year, WeekYear, DayWeek), '%G %V %u'))
