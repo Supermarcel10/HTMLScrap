@@ -11,6 +11,8 @@ from cryptography.fernet import InvalidToken
 
 from os import path, getcwd
 
+from math import ceil as math_ceil
+
 from sty import fg
 from time import sleep
 from datetime import datetime, timedelta
@@ -27,6 +29,10 @@ monthsLong = ["January", "February", "March", "April", "May", "June", "July", "A
 #           True - Disables while loop for grabbing data every set time
 #           False - Enables while loop, that will grab data every set time
 crontab = True
+
+# Setting this value will determine how many weeks before and after today are displayed.
+PreviousWeeks = 8
+FutureWeeks = 104
 
 # Setting these values determine the *.csv file titles (names), which can then be imported elsewhere such as a website.
 titles = {
@@ -156,13 +162,13 @@ def locate_datafile(url: str) -> str:
 # TODO: Make datafile creator
 def open_datafile(datafile: str):
     # if datafile.startswith("extranet"):
-    #     with open(f"data\{datafile}.txt", mode="w") as f:
+    #     with open(f"auth\{datafile}.txt", mode="w") as f:
     #         f.write(str(password_encrypt(bytes("username", "utf-8"), key), "utf-8"))
     #         f.write("\n")
     #         f.write(str(password_encrypt(bytes("password", "utf-8"), key), "utf-8"))
 
     try:
-        with open(f"data\{datafile}.txt", mode="r") as f:
+        with open(f"auth\{datafile}.txt", mode="r") as f:
             return f.readlines()
     except FileNotFoundError:
         console_log("Authentication file not found! Continuing...", "warn")
@@ -252,82 +258,129 @@ def longToShortDayName(original):
         return "Sun"
 
 
-def execute():
-    ping("https://memployees.sportsdirectservices.com/Working-Hours")
-    if locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
-        try:
-            console_log("Pulling data...")
-            _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
-            if week.endswith(")"): week = week[:-1]
-            week = week.split(" ", 3)
+def isotime():
+    Year, WeekYear, _ = datetime.today().isocalendar()
+    YearDiff = math_ceil(PreviousWeeks / 52)
 
-            weekdays = {}
+    if YearDiff > 0:
+        Year -= YearDiff
+        WeekYear = (52 * YearDiff) + WeekYear - PreviousWeeks
+        if WeekYear > 52:
+            Year += 1
+            WeekYear -= 52
 
+    del YearDiff
 
-            for i in range(0, 7):
-                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                     driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+    # print(datetime.strptime('%s %s %s' % (Year, WeekYear, 1), '%G %V %u'))
 
-            print(week, weekdays)
+    # TODO: Open or create datafile
+    TotalWeeks = FutureWeeks + PreviousWeeks
 
+    for _ in range(TotalWeeks):
+        # DayWeek = 1
+        # for _ in range(7):
+        #     print(Year, WeekYear, DayWeek)
+        #
+        #     DayWeek += 1
+        #
+        #     if DayWeek > 7:
+        #         DayWeek = 1
+        print(execute(Year, WeekYear))
 
-            _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
-            if week.endswith(")"): week = week[:-1]
-            week = week.split(" ", 3)
+        WeekYear += 1
 
-            weekdays = {}
-
-            for i in range(0, 7):
-                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                     driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text]
-
-            print(week, weekdays)
-            console_log("Successfully pulled data!")
-        except:
-            console_log("Failed whilst pulling data!", "warn")
-
+        if WeekYear > 52:
+            WeekYear = 1
+            Year += 1
 
 
-    ping("https://extranet.barnetsouthgate.ac.uk/", False)
-    if locate_login("https://extranet.barnetsouthgate.ac.uk/"):
-        weekdays = driver.find_elements_by_class_name("ttablegroup")
-        combined = {}
-        days = []
+def execute(Year, WeekYear):
+    todayYear, todayWeekYear, _ = datetime.today().isocalendar()
 
-        for i in range(len(weekdays) - 1):
-            hours = []
-
-            if weekdays[i].text.split("\n")[0].lower() in ("mon", "tue", "wed", "thu", "fri"):
-                days.append(shortToLongDayName(weekdays[i].text.split("\n")[0].lower()))
-
-            columns = weekdays[i].find_elements_by_tag_name("td")
-
-            for x in range(len(columns)):
-                if columns[x].get_attribute("colspan"):
-                    try:
-                        new_starting_time
-                    except UnboundLocalError:
-                        new_starting_time = timedelta(hours=9, minutes=x * 15)
-
-                    length = int(columns[x].get_attribute("colspan")) * 15
-                    start_time = new_starting_time
-                    end_time = start_time + timedelta(minutes=length)
-
-                    new_starting_time = end_time + timedelta(minutes=15)
-                    hours.append([str(start_time), str(end_time)])
-
-            combined[days[i]] = hours
-
+    if (todayWeekYear == WeekYear) and (todayYear == Year):
+        ping("https://memployees.sportsdirectservices.com/Working-Hours")
+        if locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
             try:
-                del new_starting_time
-            except:
-                pass
+                console_log("Pulling data...")
+                _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
+                if week.endswith(")"): week = week[:-1]
+                week = week.split(" ", 3)
 
-        print(combined)
-    else:
-        driver.quit()
+                weekdays = {}
+
+
+                for i in range(0, 7):
+                    weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                        [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                         driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+
+                return week, weekdays
+            except:
+                console_log("Failed whilst pulling data!", "warn")
+    elif (todayWeekYear + 1 == WeekYear) and (todayYear == Year):
+        if not driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3'):
+            ping("https://memployees.sportsdirectservices.com/Working-Hours")
+            if not locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
+                return None
+        else:
+            try:
+                console_log("Pulling data...")
+                _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
+                if week.endswith(")"): week = week[:-1]
+                week = week.split(" ", 3)
+
+                weekdays = {}
+
+                for i in range(0, 7):
+                    weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                        [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                         driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+
+                print(week, weekdays)
+                console_log("Successfully pulled data!")
+            except:
+                console_log("Failed whilst pulling data!", "warn")
+
+
+
+    # ping("https://extranet.barnetsouthgate.ac.uk/", False)
+    # if locate_login("https://extranet.barnetsouthgate.ac.uk/"):
+    #     weekdays = driver.find_elements_by_class_name("ttablegroup")
+    #     combined = {}
+    #     days = []
+    #
+    #     for i in range(len(weekdays) - 1):
+    #         hours = []
+    #
+    #         if weekdays[i].text.split("\n")[0].lower() in ("mon", "tue", "wed", "thu", "fri"):
+    #             days.append(shortToLongDayName(weekdays[i].text.split("\n")[0].lower()))
+    #
+    #         columns = weekdays[i].find_elements_by_tag_name("td")
+    #
+    #         for x in range(len(columns)):
+    #             if columns[x].get_attribute("colspan"):
+    #                 try:
+    #                     new_starting_time
+    #                 except UnboundLocalError:
+    #                     new_starting_time = timedelta(hours=9, minutes=x * 15)
+    #
+    #                 length = int(columns[x].get_attribute("colspan")) * 15
+    #                 start_time = new_starting_time
+    #                 end_time = start_time + timedelta(minutes=length)
+    #
+    #                 new_starting_time = end_time + timedelta(minutes=15)
+    #                 hours.append([str(start_time), str(end_time)])
+    #
+    #         combined[days[i]] = hours
+    #
+    #         try:
+    #             del new_starting_time
+    #         except:
+    #             pass
+    #
+    #     print(combined)
+    # else:
+    #     driver.quit()
 
 
 if len(key) < 1:
@@ -364,11 +417,11 @@ except:
 
 
 if __name__ == "__main__":
-    execute()
+    isotime()
 
     while not crontab:
         if (datetime.now().minute == 0) and (datetime.now().second == 0):
-            execute()
+            isotime()
         else:
             sleep(1)
 
