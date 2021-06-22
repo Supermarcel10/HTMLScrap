@@ -1,3 +1,4 @@
+import selenium.common.exceptions
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -9,12 +10,14 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import InvalidToken
 
+from itertools import zip_longest
 from os import path, getcwd
 from pandas import DataFrame, read_csv
 from math import ceil as math_ceil
 from sty import fg
 from time import sleep
 from datetime import datetime, timedelta
+from calendar import monthrange
 from secrets import token_bytes
 from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
 
@@ -25,7 +28,7 @@ monthsLong = ["January", "February", "March", "April", "May", "June", "July", "A
 
 
 # A set of URLs the program executes and the type of execution..
-URLs = {"https://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek", "Past30"],
+URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek", "Past30"],
         "https://extranet.barnetsouthgate.ac.uk/": ["All"]}
 
 # Setting this value will determine if you use Linux crontab for running your task.
@@ -40,14 +43,19 @@ FutureWeeks = 104
 # Setting these values determine the *.csv file titles (names), which can then be imported elsewhere such as a website.
 titles = {
     "extranet.barnetsouthgate.ac.uk": "college",
-    "memployees.sportsdirectservices.com.txt": "work",
+    "memployees.sportsdirectservices.com": "work",
     "*": "other"
 }
+
+# Set this value to the xpath of where the data is pulled from
+loggedElement = {"extranet.barnetsouthgate.ac.uk": "add",
+                 "memployees.sportsdirectservices.com": '//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3'
+                 }
 
 # Setting the key to a value will read the key and use it for decryption.
 # If a key is not specified, a key will be asked on every startup.
 # WARNING: SETTING A PERMANENT KEY MAY BE A SAFETY VULNERABILITY!
-key = "1"
+key = ""
 
 
 
@@ -304,11 +312,10 @@ def execute(Year, WeekYear):
     print(URLs)
 
     for url in URLs:
-        file = locate_datafile(url)
+        fileName = locate_datafile(url)
 
         try:
-            df = read_csv("data/%s.csv" % file)
-            print(df)
+            df = read_csv("data/%s.csv" % fileName)
             # TODO: Think what to do with this...
         except:
             df = DataFrame(columns=["title", "date", "start_time", "end_time"])
@@ -324,45 +331,73 @@ def execute(Year, WeekYear):
                 print("# TODO: Make all execution styles")
                 # TODO: Make all execution styles
             else:
-                if execution.lower() == "presentweek":
-                    continue
+                if driver.current_url != url:
+                    ping(url)
 
-                if execution.lower() == "nextweek":
-                    WeekYear += 1
-                elif execution.lower().startswith("next"):
-                    WeekYear += int(execution[-2:])
+                try:
+                    print(driver.find_element_by_xpath(loggedElement[fileName]))
+                except selenium.common.exceptions.NoSuchElementException:
+                    if locate_login(url):
+                        if locate_login(url) or driver.find_element_by_xpath(loggedElement[fileName]):
+                            if execution.lower() == "presentweek":
+                                console_log('Attempting to grab present week for profile "%s".' % titles[fileName])
 
-                if execution.lower() == "pastweek":
-                    WeekYear -= 1
-                elif execution.lower().startswith("past"):
-                    WeekYear -= int(execution[-2:])
+                                try:
+                                    console_log("Pulling data...")
+                                    _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
+                                    if week.endswith(")"): week = week[:-1]
+                                    week = week.split(" ", 3)
 
-        df.to_csv("data/%s.csv" % file, index=False, sep=";", na_rep="---")
+                                    weekdays = {}
 
-    # if (todayWeekYear == WeekYear) and (todayYear == Year):
-    #     ping("https://memployees.sportsdirectservices.com/Working-Hours")
-    #     if locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
-    #         try:
-    #             console_log("Pulling data...")
-    #             _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
-    #             if week.endswith(")"): week = week[:-1]
-    #             week = week.split(" ", 3)
-    #
-    #             weekdays = {}
-    #
-    #
-    #             for i in range(0, 7):
-    #                 weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-    #                     [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-    #                      driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
-    #
-    #             return week, weekdays
-    #         except:
-    #             console_log("Failed whilst pulling data!", "warn")
-    # elif (todayWeekYear + 1 == WeekYear) and (todayYear == Year):
+                                    for i in range(0, 7):
+                                        weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                            [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                             driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+
+                                    console_log("Successfully pulled data!")
+
+                                    try:
+                                        console_log("Pushing data for %s..." % titles[fileName])
+
+                                        for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
+                                            if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
+                                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
+                                            else:
+                                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
+                                                                                       datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
+
+                                            df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1]]], columns=["title", "date", "start_time", "end_time"]),
+                                                           ignore_index=True)
+
+                                            console_log("Successfully pushed data for %s!" % titles[fileName])
+                                    except:
+                                        console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
+                                except:
+                                    console_log("Failed whilst pulling data!", "warn")
+
+
+                            if execution.lower() == "nextweek":
+                                WeekYear += 1
+                            elif execution.lower().startswith("next"):
+                                WeekYear += int(execution[-2:])
+
+                            if execution.lower() == "pastweek":
+                                WeekYear -= 1
+                            elif execution.lower().startswith("past"):
+                                WeekYear -= int(execution[-2:])
+                    else:
+                        console_log("Failed to authenticate at %s!" % url, "warn")
+
+
+
+        df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="---")
+
+
+    # if (todayWeekYear + 1 == WeekYear) and (todayYear == Year):
     #     if not driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3'):
-    #         ping("https://memployees.sportsdirectservices.com/Working-Hours")
-    #         if not locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
+    #         ping("http://memployees.sportsdirectservices.com/Working-Hours")
+    #         if not locate_login("http://memployees.sportsdirectservices.com/Working-Hours"):
     #             return None
     #     else:
     #         try:
@@ -382,8 +417,6 @@ def execute(Year, WeekYear):
     #             console_log("Successfully pulled data!")
     #         except:
     #             console_log("Failed whilst pulling data!", "warn")
-
-
 
     # ping("https://extranet.barnetsouthgate.ac.uk/", False)
     # if locate_login("https://extranet.barnetsouthgate.ac.uk/"):
