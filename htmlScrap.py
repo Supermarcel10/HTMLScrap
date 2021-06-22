@@ -10,9 +10,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import InvalidToken
 
 from os import path, getcwd
-
+from pandas import DataFrame, read_csv
 from math import ceil as math_ceil
-
 from sty import fg
 from time import sleep
 from datetime import datetime, timedelta
@@ -24,6 +23,10 @@ iterations = 100_000
 monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 monthsLong = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
+
+# A set of URLs the program executes and the type of execution..
+URLs = {"https://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek", "Past30"],
+        "https://extranet.barnetsouthgate.ac.uk/": ["All"]}
 
 # Setting this value will determine if you use Linux crontab for running your task.
 #           True - Disables while loop for grabbing data every set time
@@ -37,13 +40,14 @@ FutureWeeks = 104
 # Setting these values determine the *.csv file titles (names), which can then be imported elsewhere such as a website.
 titles = {
     "extranet.barnetsouthgate.ac.uk": "college",
-    "memployees.sportsdirectservices.com.txt": "work"
+    "memployees.sportsdirectservices.com.txt": "work",
+    "*": "other"
 }
 
 # Setting the key to a value will read the key and use it for decryption.
 # If a key is not specified, a key will be asked on every startup.
 # WARNING: SETTING A PERMANENT KEY MAY BE A SAFETY VULNERABILITY!
-key = ""
+key = "1"
 
 
 
@@ -276,70 +280,108 @@ def isotime():
     # TODO: Open or create datafile
     TotalWeeks = FutureWeeks + PreviousWeeks
 
-    for _ in range(TotalWeeks):
-        # DayWeek = 1
-        # for _ in range(7):
-        #     print(Year, WeekYear, DayWeek)
-        #
-        #     DayWeek += 1
-        #
-        #     if DayWeek > 7:
-        #         DayWeek = 1
-        print(execute(Year, WeekYear))
+    execute(Year, WeekYear)
 
-        WeekYear += 1
-
-        if WeekYear > 52:
-            WeekYear = 1
-            Year += 1
+    # for _ in range(TotalWeeks):
+    #     # DayWeek = 1
+    #     # for _ in range(7):
+    #     #     print(Year, WeekYear, DayWeek)
+    #     #
+    #     #     DayWeek += 1
+    #     #
+    #     #     if DayWeek > 7:
+    #     #         DayWeek = 1
+    #     print(execute(Year, WeekYear))
+    #
+    #     WeekYear += 1
+    #
+    #     if WeekYear > 52:
+    #         WeekYear = 1
+    #         Year += 1
 
 
 def execute(Year, WeekYear):
-    todayYear, todayWeekYear, _ = datetime.today().isocalendar()
+    print(URLs)
 
-    if (todayWeekYear == WeekYear) and (todayYear == Year):
-        ping("https://memployees.sportsdirectservices.com/Working-Hours")
-        if locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
-            try:
-                console_log("Pulling data...")
-                _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
-                if week.endswith(")"): week = week[:-1]
-                week = week.split(" ", 3)
+    for url in URLs:
+        file = locate_datafile(url)
 
-                weekdays = {}
+        try:
+            df = read_csv("data/%s.csv" % file)
+            print(df)
+            # TODO: Think what to do with this...
+        except:
+            df = DataFrame(columns=["title", "date", "start_time", "end_time"])
 
+        # # For appending new values
+        # df = df.append(DataFrame([["test", "test", "test", "test"]], columns=["title", "date", "start_time", "end_time"]), ignore_index=True)
 
-                for i in range(0, 7):
-                    weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                        [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                         driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+        for execution in URLs[url]:
+            """Execution types: ALL, PRESENTWEEK, NEXTWEEK, PASTWEEK, NEXT30 (next 30 weeks) or PAST30 (past 30 weeks)."""
+            Year, WeekYear, _ = datetime.today().isocalendar()
 
-                return week, weekdays
-            except:
-                console_log("Failed whilst pulling data!", "warn")
-    elif (todayWeekYear + 1 == WeekYear) and (todayYear == Year):
-        if not driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3'):
-            ping("https://memployees.sportsdirectservices.com/Working-Hours")
-            if not locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
-                return None
-        else:
-            try:
-                console_log("Pulling data...")
-                _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
-                if week.endswith(")"): week = week[:-1]
-                week = week.split(" ", 3)
+            if execution.lower() == "all":
+                print("# TODO: Make all execution styles")
+                # TODO: Make all execution styles
+            else:
+                if execution.lower() == "presentweek":
+                    continue
 
-                weekdays = {}
+                if execution.lower() == "nextweek":
+                    WeekYear += 1
+                elif execution.lower().startswith("next"):
+                    WeekYear += int(execution[-2:])
 
-                for i in range(0, 7):
-                    weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                        [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                         driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+                if execution.lower() == "pastweek":
+                    WeekYear -= 1
+                elif execution.lower().startswith("past"):
+                    WeekYear -= int(execution[-2:])
 
-                print(week, weekdays)
-                console_log("Successfully pulled data!")
-            except:
-                console_log("Failed whilst pulling data!", "warn")
+        df.to_csv("data/%s.csv" % file, index=False, sep=";", na_rep="---")
+
+    # if (todayWeekYear == WeekYear) and (todayYear == Year):
+    #     ping("https://memployees.sportsdirectservices.com/Working-Hours")
+    #     if locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
+    #         try:
+    #             console_log("Pulling data...")
+    #             _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
+    #             if week.endswith(")"): week = week[:-1]
+    #             week = week.split(" ", 3)
+    #
+    #             weekdays = {}
+    #
+    #
+    #             for i in range(0, 7):
+    #                 weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+    #                     [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+    #                      driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+    #
+    #             return week, weekdays
+    #         except:
+    #             console_log("Failed whilst pulling data!", "warn")
+    # elif (todayWeekYear + 1 == WeekYear) and (todayYear == Year):
+    #     if not driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3'):
+    #         ping("https://memployees.sportsdirectservices.com/Working-Hours")
+    #         if not locate_login("https://memployees.sportsdirectservices.com/Working-Hours"):
+    #             return None
+    #     else:
+    #         try:
+    #             console_log("Pulling data...")
+    #             _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
+    #             if week.endswith(")"): week = week[:-1]
+    #             week = week.split(" ", 3)
+    #
+    #             weekdays = {}
+    #
+    #             for i in range(0, 7):
+    #                 weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+    #                     [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+    #                      driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+    #
+    #             print(week, weekdays)
+    #             console_log("Successfully pulled data!")
+    #         except:
+    #             console_log("Failed whilst pulling data!", "warn")
 
 
 
