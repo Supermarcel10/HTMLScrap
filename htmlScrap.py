@@ -288,7 +288,7 @@ def isotime():
     # TODO: Open or create datafile
     TotalWeeks = FutureWeeks + PreviousWeeks
 
-    execute(Year, WeekYear)
+    combine(Year, WeekYear)
 
     # for _ in range(TotalWeeks):
     #     # DayWeek = 1
