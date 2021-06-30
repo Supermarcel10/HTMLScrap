@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import InvalidToken
 
 from itertools import zip_longest
-from os import path, getcwd
+from os import path, getcwd, remove as os_rm
 from pandas import DataFrame, read_csv
 from math import ceil as math_ceil
 from sty import fg
@@ -28,8 +28,8 @@ monthsLong = ["January", "February", "March", "April", "May", "June", "July", "A
 
 
 # A set of URLs the program executes and the type of execution..
-URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek", "Past30"],
-        "https://extranet.barnetsouthgate.ac.uk/": ["All"]}
+URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek"],
+        "https://extranet.barnetsouthgate.ac.uk/": ["Past30", "PresentWeek", "Next30"]}
 
 # Setting this value will determine if you use Linux crontab for running your task.
 #           True - Disables while loop for grabbing data every set time
@@ -308,15 +308,16 @@ def isotime():
     #         Year += 1
 
 
-def execute(Year, WeekYear):
+def combine(Year, WeekYear):
     print(URLs)
 
     for url in URLs:
         fileName = locate_datafile(url)
 
         try:
-            df = read_csv("data/%s.csv" % fileName)
-            # TODO: Think what to do with this...
+            read_csv("data/%s.csv" % fileName)
+            os_rm("data/%s.csv" % fileName)
+            df = DataFrame(columns=["title", "date", "start_time", "end_time"])
         except:
             df = DataFrame(columns=["title", "date", "start_time", "end_time"])
 
@@ -324,72 +325,105 @@ def execute(Year, WeekYear):
         # df = df.append(DataFrame([["test", "test", "test", "test"]], columns=["title", "date", "start_time", "end_time"]), ignore_index=True)
 
         for execution in URLs[url]:
-            """Execution types: ALL, PRESENTWEEK, NEXTWEEK, PASTWEEK, NEXT30 (next 30 weeks) or PAST30 (past 30 weeks)."""
+            """Execution types: PRESENTWEEK, NEXTWEEK, PASTWEEK, NEXT30 (next 30 weeks) or PAST30 (past 30 weeks)."""
             Year, WeekYear, _ = datetime.today().isocalendar()
 
-            if execution.lower() == "all":
-                print("# TODO: Make all execution styles")
-                # TODO: Make all execution styles
-            else:
-                if driver.current_url != url:
-                    ping(url)
+            if driver.current_url != url:
+                ping(url)
 
-                try:
-                    print(driver.find_element_by_xpath(loggedElement[fileName]))
-                except selenium.common.exceptions.NoSuchElementException:
-                    if locate_login(url):
-                        if locate_login(url) or driver.find_element_by_xpath(loggedElement[fileName]):
-                            if execution.lower() == "presentweek":
-                                console_log('Attempting to grab present week for profile "%s".' % titles[fileName])
+            try:
+                if driver.find_element_by_xpath(loggedElement[fileName]):
+                    continue
+            except selenium.common.exceptions.NoSuchElementException:
+                if locate_login(url):
+                    continue
+                else:
+                    console_log("Failed to authenticate at %s!" % url, "warn")
+            finally:
+                if execution.lower() == "presentweek":
+                    console_log('Attempting to grab present week for profile "%s".' % titles[fileName])
 
-                                try:
-                                    console_log("Pulling data...")
-                                    _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
-                                    if week.endswith(")"): week = week[:-1]
-                                    week = week.split(" ", 3)
+                    try:
+                        console_log("Pulling data...")
+                        _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
+                        if week.endswith(")"): week = week[:-1]
+                        week = week.split(" ", 3)
 
-                                    weekdays = {}
+                        weekdays = {}
 
-                                    for i in range(0, 7):
-                                        weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                                            [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                                             driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+                        for i in range(0, 7):
+                            weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                 driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
 
-                                    console_log("Successfully pulled data!")
+                        console_log("Successfully pulled data!")
 
-                                    try:
-                                        console_log("Pushing data for %s..." % titles[fileName])
+                        try:
+                            console_log("Pushing data.")
 
-                                        for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
-                                            if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
-                                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
-                                            else:
-                                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
-                                                                                       datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
+                            for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
+                                if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
+                                    date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
+                                else:
+                                    date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
+                                                                           datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
 
-                                            df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1]]], columns=["title", "date", "start_time", "end_time"]),
-                                                           ignore_index=True)
+                                df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1]]], columns=["title", "date", "start_time", "end_time"]),
+                                               ignore_index=True)
 
-                                            console_log("Successfully pushed data for %s!" % titles[fileName])
-                                    except:
-                                        console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
-                                except:
-                                    console_log("Failed whilst pulling data!", "warn")
+                                console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
+                        except:
+                            console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
+                    except:
+                        console_log("Failed whilst pulling data!", "warn")
 
+                if execution.lower() == "nextweek":
+                    console_log('Attempting to grab next week for profile "%s".' % titles[fileName])
 
-                            if execution.lower() == "nextweek":
-                                WeekYear += 1
-                            elif execution.lower().startswith("next"):
-                                WeekYear += int(execution[-2:])
+                    try:
+                        console_log("Pulling data...")
+                        _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
+                        if week.endswith(")"): week = week[:-1]
+                        week = week.split(" ", 3)
 
-                            if execution.lower() == "pastweek":
-                                WeekYear -= 1
-                            elif execution.lower().startswith("past"):
-                                WeekYear -= int(execution[-2:])
-                    else:
-                        console_log("Failed to authenticate at %s!" % url, "warn")
+                        weekdays = {}
 
+                        for i in range(0, 7):
+                            weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = [
+                                driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text]
 
+                        console_log("Successfully pulled data!")
+
+                        try:
+                            console_log("Pushing data.")
+
+                            for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
+                                if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
+                                    date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
+                                else:
+                                    date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
+                                                                           datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
+
+                                df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1]]], columns=["title", "date", "start_time", "end_time"]),
+                                               ignore_index=True)
+
+                                console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
+                        except:
+                            console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
+                    except:
+                        console_log("Failed whilst pulling data!", "warn")
+
+                elif execution.lower().startswith("next"):
+                    WeekYear += int(execution[-2:])
+                    # TODO: Next Execution type
+
+                if execution.lower() == "pastweek":
+                    # TODO: Past week Execution type
+                    WeekYear -= 1
+                elif execution.lower().startswith("past"):
+                    # TODO: Past weeks Execution types
+                    WeekYear -= int(execution[-2:])
 
         df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="---")
 
