@@ -188,7 +188,7 @@ def open_datafile(datafile: str):
 
 
 def locate_login(url: str):
-    console_log("Locating fields at %s..." % url)
+    console_log("Locating fields...")
 
     datafile = locate_datafile(url)
     data = open_datafile(datafile)
@@ -201,7 +201,7 @@ def locate_login(url: str):
             driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtUsername").send_keys(str(password_decrypt(bytes(data[0], "utf-8"), key), "utf-8"))
             driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtPassword").send_keys(str(password_decrypt(bytes(data[1], "utf-8"), key), "utf-8"))
 
-            console_log("Successfully located fields at %s!" % url)
+            console_log("Successfully located fields!")
 
             return authenticate(url, str(password_decrypt(bytes(data[0], "utf-8"), key), "utf-8"))
         except InvalidToken:
@@ -225,7 +225,7 @@ def locate_login(url: str):
 
 def authenticate(url: str, username: str):
     try:
-        console_log("Attempting authentication at %s." % url)
+        console_log("Attempting authentication...")
 
         driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_cmdLogin").click()
         WebDriverWait(driver, 1).until(EC.presence_of_element_located((By.ID, 'dnn_ctr454_ModuleContent')))
@@ -317,9 +317,9 @@ def combine(Year, WeekYear):
         try:
             read_csv("data/%s.csv" % fileName)
             os_rm("data/%s.csv" % fileName)
-            df = DataFrame(columns=["title", "date", "start_time", "end_time"])
+            df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
         except:
-            df = DataFrame(columns=["title", "date", "start_time", "end_time"])
+            df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
 
         # # For appending new values
         # df = df.append(DataFrame([["test", "test", "test", "test"]], columns=["title", "date", "start_time", "end_time"]), ignore_index=True)
@@ -352,10 +352,20 @@ def combine(Year, WeekYear):
                         weekdays = {}
 
                         for i in range(0, 7):
-                            weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                                [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                                 driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+                            ending_time = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text
 
+                            if " " in ending_time:
+                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                     ending_time.split(" ")[0],
+                                     ending_time.split(" ")[1]]
+                            else:
+                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                     ending_time,
+                                     None]
+
+                        del ending_time
                         console_log("Successfully pulled data!")
 
                         try:
@@ -368,7 +378,8 @@ def combine(Year, WeekYear):
                                     date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
                                                                            datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
 
-                                df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1]]], columns=["title", "date", "start_time", "end_time"]),
+                                df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1], weekdays[day][2], 0]], columns=["title", "date", "start_time",
+                                                                                                                                                       "end_time", "extras", "disabled"]),
                                                ignore_index=True)
 
                                 console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
@@ -493,7 +504,8 @@ def combine(Year, WeekYear):
 
 
 if len(key) < 1:
-    key = str(input("Key: "))
+    from getpass import getpass
+    key = getpass("Key:")
 
 console_log('Running selentium version: "%s".' % webdriver.__version__)
 
@@ -517,6 +529,7 @@ try:
 except:
     console_log("Browser window crashed or failed to open!", "error")
     console_log("Time elapsed: %fs.\n Exit code: -1" % (datetime.now() - time_start).total_seconds())
+    del time_start
     raise EnvironmentError("Browser has crashed!")
 try:
     driver.set_page_load_timeout(30)
