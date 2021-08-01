@@ -10,10 +10,10 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import InvalidToken
 
+from platform import system as sysplatform
 from itertools import zip_longest
 from os import path, getcwd, remove as os_rm
 from pandas import DataFrame, read_csv
-from math import ceil as math_ceil
 from sty import fg
 from time import sleep
 from datetime import datetime, timedelta
@@ -27,6 +27,10 @@ monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "O
 monthsLong = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
 
+# Directory of your browser.
+# Note: Windows is already supported out of box.
+SelectedBrowser = ""
+
 # A set of URLs the program executes and the type of execution..
 URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek"],
         "https://extranet.barnetsouthgate.ac.uk/": ["Past30", "PresentWeek", "Next30"]}
@@ -36,9 +40,12 @@ URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWee
 #           False - Enables while loop, that will grab data every set time
 crontab = True
 
-# Setting this value will determine how many weeks before and after today are displayed.
-PreviousWeeks = 8
-FutureWeeks = 104
+# Setting this value will determine if a log file is created for every run.
+FileLogging = True
+
+# Setting this value will determine how many log files will be kept.
+# Oldest log files will be deleted. Fatal crashes will be kept separately.
+FileLogHistory = 24
 
 # Setting these values determine the *.csv file titles (names), which can then be imported elsewhere such as a website.
 titles = {
@@ -270,45 +277,11 @@ def longToShortDayName(original):
         return "Sun"
 
 
-def isotime():
-    Year, WeekYear, _ = datetime.today().isocalendar()
-    YearDiff = math_ceil(PreviousWeeks / 52)
-
-    if YearDiff > 0:
-        Year -= YearDiff
-        WeekYear = (52 * YearDiff) + WeekYear - PreviousWeeks
-        if WeekYear > 52:
-            Year += 1
-            WeekYear -= 52
-
-    del YearDiff
-
-    # print(datetime.strptime('%s %s %s' % (Year, WeekYear, 1), '%G %V %u'))
-
+# def isotime():
     # TODO: Open or create datafile
-    TotalWeeks = FutureWeeks + PreviousWeeks
-
-    combine(Year, WeekYear)
-
-    # for _ in range(TotalWeeks):
-    #     # DayWeek = 1
-    #     # for _ in range(7):
-    #     #     print(Year, WeekYear, DayWeek)
-    #     #
-    #     #     DayWeek += 1
-    #     #
-    #     #     if DayWeek > 7:
-    #     #         DayWeek = 1
-    #     print(execute(Year, WeekYear))
-    #
-    #     WeekYear += 1
-    #
-    #     if WeekYear > 52:
-    #         WeekYear = 1
-    #         Year += 1
 
 
-def combine(Year, WeekYear):
+def isotime():
     print(URLs)
 
     for url in URLs:
@@ -435,7 +408,6 @@ def combine(Year, WeekYear):
                             console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
                     except Exception as err:
                         console_log("Failed whilst pulling data!", "warn")
-                        print(err)
 
                 elif execution.lower().startswith("next"):
                     WeekYear += int(execution[-2:])
@@ -451,69 +423,6 @@ def combine(Year, WeekYear):
         df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="---")
 
 
-    # if (todayWeekYear + 1 == WeekYear) and (todayYear == Year):
-    #     if not driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3'):
-    #         ping("http://memployees.sportsdirectservices.com/Working-Hours")
-    #         if not locate_login("http://memployees.sportsdirectservices.com/Working-Hours"):
-    #             return None
-    #     else:
-    #         try:
-    #             console_log("Pulling data...")
-    #             _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
-    #             if week.endswith(")"): week = week[:-1]
-    #             week = week.split(" ", 3)
-    #
-    #             weekdays = {}
-    #
-    #             for i in range(0, 7):
-    #                 weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-    #                     [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-    #                      driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text]
-    #
-    #             print(week, weekdays)
-    #             console_log("Successfully pulled data!")
-    #         except:
-    #             console_log("Failed whilst pulling data!", "warn")
-
-    # ping("https://extranet.barnetsouthgate.ac.uk/", False)
-    # if locate_login("https://extranet.barnetsouthgate.ac.uk/"):
-    #     weekdays = driver.find_elements_by_class_name("ttablegroup")
-    #     combined = {}
-    #     days = []
-    #
-    #     for i in range(len(weekdays) - 1):
-    #         hours = []
-    #
-    #         if weekdays[i].text.split("\n")[0].lower() in ("mon", "tue", "wed", "thu", "fri"):
-    #             days.append(shortToLongDayName(weekdays[i].text.split("\n")[0].lower()))
-    #
-    #         columns = weekdays[i].find_elements_by_tag_name("td")
-    #
-    #         for x in range(len(columns)):
-    #             if columns[x].get_attribute("colspan"):
-    #                 try:
-    #                     new_starting_time
-    #                 except UnboundLocalError:
-    #                     new_starting_time = timedelta(hours=9, minutes=x * 15)
-    #
-    #                 length = int(columns[x].get_attribute("colspan")) * 15
-    #                 start_time = new_starting_time
-    #                 end_time = start_time + timedelta(minutes=length)
-    #
-    #                 new_starting_time = end_time + timedelta(minutes=15)
-    #                 hours.append([str(start_time), str(end_time)])
-    #
-    #         combined[days[i]] = hours
-    #
-    #         try:
-    #             del new_starting_time
-    #         except:
-    #             pass
-    #
-    #     print(combined)
-    # else:
-    #     driver.quit()
-
 
 if len(key) < 1:
     from getpass import getpass
@@ -521,7 +430,15 @@ if len(key) < 1:
 
 console_log('Running selentium version: "%s".' % webdriver.__version__)
 
-browser = path.realpath(getcwd() + "/chromedriver.exe")
+
+if sysplatform() == "Windows":
+    browser = path.realpath(getcwd() + "/chromedriver.exe")
+else:
+    if SelectedBrowser:
+        browser = path.realpath(SelectedBrowser)
+    else:
+        raise selenium.common.exceptions.WebDriverException()
+
 console_log('Selected browser at system path: "%s"' % browser)
 
 log = path.realpath("..\\.temp")
