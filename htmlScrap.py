@@ -400,10 +400,20 @@ def combine(Year, WeekYear):
                         weekdays = {}
 
                         for i in range(0, 7):
-                            weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = [
-                                driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                                driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text]
+                            ending_time = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text
 
+                            if " " in ending_time:
+                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                     ending_time.split(" ")[0],
+                                     ending_time.split(" ")[1]]
+                            else:
+                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                     ending_time,
+                                     None]
+
+                        del ending_time
                         console_log("Successfully pulled data!")
 
                         try:
@@ -416,14 +426,16 @@ def combine(Year, WeekYear):
                                     date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
                                                                            datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
 
-                                df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1]]], columns=["title", "date", "start_time", "end_time"]),
+                                df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1], weekdays[day][2], 0]], columns=["title", "date", "start_time", "end_time", "extras",
+                                                                                                                                  "disabled"]),
                                                ignore_index=True)
 
                                 console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
                         except:
                             console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
-                    except:
+                    except Exception as err:
                         console_log("Failed whilst pulling data!", "warn")
+                        print(err)
 
                 elif execution.lower().startswith("next"):
                     WeekYear += int(execution[-2:])
