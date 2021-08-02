@@ -434,6 +434,7 @@ else:
     if SelectedBrowser:
         browser = os_path.realpath(SelectedBrowser)
     else:
+        console_log("No browser has been setup!\n Exit Code: -1", "error")
         raise selenium.common.exceptions.WebDriverException()
 
 console_log('Selected browser at system path: "%s"' % browser)
