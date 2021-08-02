@@ -12,7 +12,7 @@ from cryptography.fernet import InvalidToken
 
 from platform import system as sysplatform
 from itertools import zip_longest
-from os import path, getcwd, remove as os_rm
+from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove as os_rm
 from pandas import DataFrame, read_csv
 from sty import fg
 from time import sleep
@@ -287,15 +287,15 @@ def isotime():
     for url in URLs:
         fileName = locate_datafile(url)
 
+        if not os_path.exists("data"):
+            os_mkdir("data")
+
         try:
             read_csv("data/%s.csv" % fileName)
-            os_rm("data/%s.csv" % fileName)
+            os_rm("data/%s.csv" % fileName) # TODO: Maybe update
             df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
         except:
             df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
-
-        # # For appending new values
-        # df = df.append(DataFrame([["test", "test", "test", "test"]], columns=["title", "date", "start_time", "end_time"]), ignore_index=True)
 
         for execution in URLs[url]:
             """Execution types: PRESENTWEEK, NEXTWEEK, PASTWEEK, NEXT30 (next 30 weeks) or PAST30 (past 30 weeks)."""
@@ -432,18 +432,18 @@ console_log('Running selentium version: "%s".' % webdriver.__version__)
 
 
 if sysplatform() == "Windows":
-    browser = path.realpath(getcwd() + "/chromedriver.exe")
+    browser = os_path.realpath(os_getcwd() + "/chromedriver.exe")
 else:
     if SelectedBrowser:
-        browser = path.realpath(SelectedBrowser)
+        browser = os_path.realpath(SelectedBrowser)
     else:
         raise selenium.common.exceptions.WebDriverException()
 
 console_log('Selected browser at system path: "%s"' % browser)
 
-log = path.realpath("..\\.temp")
+log = os_path.realpath("..\\.temp")
 
-if path.exists(browser):
+if os_path.exists(browser):
     console_log('Located browser at "%s".' % browser)
 else:
     console_log("Unable to locate browser!\n Exit Code: -1", "error")
