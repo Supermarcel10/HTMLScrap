@@ -64,7 +64,7 @@ titles = {
 }
 
 # Set this value to the xpath of where the data is pulled from
-loggedElement = {"extranet.barnetsouthgate.ac.uk": "add",
+loggedElement = {"extranet.barnetsouthgate.ac.uk": None,
                  "memployees.sportsdirectservices.com": '//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3'
                  }
 
@@ -211,7 +211,7 @@ def locate_login(url: str):
 
     if not data:
         return
-
+    # TODO: Redo in the form of an option menu.
     if datafile == "memployees.sportsdirectservices.com":
         try:
             driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtUsername").send_keys(str(password_decrypt(bytes(data[0], "utf-8"), key), "utf-8"))
@@ -228,7 +228,11 @@ def locate_login(url: str):
     elif datafile == "extranet.barnetsouthgate.ac.uk":
         try:
             _, week_num, _ = datetime.today().isocalendar()
-            ping(f"https://%s:%s@extranet.barnetsouthgate.ac.uk/registers/timetable/user/week/{week_num + 22}" % (str(password_decrypt(bytes(data[0], "utf-8"), key), "utf-8"),
+            week_num += 22
+            if week_num > 52:
+                return False
+
+            ping(f"https://%s:%s@extranet.barnetsouthgate.ac.uk/registers/timetable/user/week/{week_num}" % (str(password_decrypt(bytes(data[0], "utf-8"), key), "utf-8"),
                                                                                                                   str(password_decrypt(bytes(data[1], "utf-8"), key), "utf-8")), True)
             return True
         except InvalidToken:
@@ -311,8 +315,9 @@ def isotime():
                 ping(url)
 
             try:
-                if driver.find_element_by_xpath(loggedElement[fileName]):
-                    continue
+                if loggedElement[fileName] is not None:
+                    if driver.find_element_by_xpath(loggedElement[fileName]):
+                        continue
             except selenium.common.exceptions.NoSuchElementException:
                 if locate_login(url):
                     continue
