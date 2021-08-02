@@ -287,9 +287,6 @@ def isotime():
     for url in URLs:
         fileName = locate_datafile(url)
 
-        if not os_path.exists("data"):
-            os_mkdir("data")
-
         try:
             read_csv("data/%s.csv" % fileName)
             os_rm("data/%s.csv" % fileName) # TODO: Maybe update
@@ -448,6 +445,12 @@ if os_path.exists(browser):
 else:
     console_log("Unable to locate browser!\n Exit Code: -1", "error")
     raise FileNotFoundError("Unable to locate browser!")
+
+if not os_path.exists("data"):
+    os_mkdir("data")
+
+if not os_path.exists("auth"):
+    os_mkdir("auth")
 
 console_log("Attempting to run browser...")
 
