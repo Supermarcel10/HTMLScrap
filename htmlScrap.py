@@ -1,5 +1,7 @@
 import selenium.common.exceptions
+
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -10,6 +12,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import InvalidToken
 
+from torch import cuda
 from platform import system as sysplatform
 from itertools import zip_longest
 from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove as os_rm
@@ -30,6 +33,12 @@ monthsLong = ["January", "February", "March", "April", "May", "June", "July", "A
 # Directory of your browser.
 # Note: Windows is already supported out of box.
 SelectedBrowser = ""
+
+# Options of how the browser is executed.
+browser_options = ChromeOptions()
+
+browser_options.add_argument("--headless")
+browser_options.add_argument("--disable-gpu")
 
 # A set of URLs the program executes and the type of execution..
 URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek"],
@@ -457,7 +466,7 @@ console_log("Attempting to run browser...")
 
 try:
     time_start = datetime.now()
-    driver = webdriver.Chrome(browser)
+    driver = webdriver.Chrome(options=browser_options, executable_path=browser)
     console_log("Browser successfully executed!")
 except:
     console_log("Browser window crashed or failed to open!", "error")
