@@ -1,5 +1,3 @@
-import os
-
 import selenium.common.exceptions
 
 from selenium import webdriver
@@ -14,10 +12,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import InvalidToken
 
-from torch import cuda
 from platform import system as sysplatform
 from itertools import zip_longest
-from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove as os_rm
+from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove as os_rm, replace as os_move, walk as os_search
 from pandas import DataFrame, read_csv
 from sty import fg
 from time import sleep
@@ -34,7 +31,7 @@ monthsLong = ["January", "February", "March", "April", "May", "June", "July", "A
 
 # Directory of your browser.
 # Note: Windows is already supported out of box.
-SelectedBrowser = ""
+SelectedBrowser = "/usr/bin/chromedriver"
 
 # Options of how the browser is executed.
 BrowserOptions = ChromeOptions()
@@ -56,6 +53,7 @@ FileLogging = True
 
 # Setting this value will determine how many log files will be kept.
 # Oldest log files will be deleted. Fatal crashes will be kept separately.
+FileLogLimit = True
 FileLogHistory = 24
 
 # Setting these values determine the *.csv file titles (names), which can then be imported elsewhere such as a website.
@@ -129,6 +127,9 @@ def console_log(message: str = None, mode: str = "info"):
     if FileLogging:
         if mode == "error":
             CurrentLog.write(f"!!! [{now}] {message}\n")
+            CurrentLog.close()
+            os_move(f"logs/{CurrentLogName}.log", f"logs/fatal/{CurrentLogName}.log")
+            exit(-1)
         elif mode == "warn":
             CurrentLog.write(f"??? [{now}] {message}\n")
         else:
@@ -232,7 +233,7 @@ def locate_login(url: str):
 
             return authenticate(url, str(password_decrypt(bytes(data[0], "utf-8"), key), "utf-8"))
         except InvalidToken:
-            console_log("Cryptography key for authentication is invalid!\nContinuing...", "warn")
+            console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
         except:
             console_log("Failed to locate fields for website %s!" % url, "warn")
 
@@ -247,7 +248,7 @@ def locate_login(url: str):
                                                                                                                   str(password_decrypt(bytes(data[1], "utf-8"), key), "utf-8")), True)
             return True
         except InvalidToken:
-            console_log("Cryptography key for authentication is invalid!\nContinuing...", "warn")
+            console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
             return False
         except:
             console_log("Failed to login to website %s!" % url, "warn")
@@ -461,13 +462,16 @@ if FileLogging:
         os_mkdir("logs")
         os_mkdir("logs/fatal")
 
-    now = str(datetime.now().strftime('%m-%d-%Y %Hh %Mm %Ss'))
+    CurrentLogName = str(datetime.now().strftime('%m-%d-%Y %H%M%S'))
 
-    open(r"logs/%s.txt" % now, "x")
-    CurrentLog = open(r"logs/%s.txt" % now, "a")
-    # TODO: Enforce limit
-    # TODO: Movement to fatal error storage.
+    open(r"logs/%s.log" % CurrentLogName, "x")
+    CurrentLog = open(r"logs/%s.log" % CurrentLogName, "a")
 
+    if FileLogLimit:
+        for files in os_search(r"logs/"):
+            while len(files[2]) > FileLogHistory - 1:
+                os_rm(min(["logs/{0}".format(f) for f in files[2]], key=os_path.getctime))
+                files[2].pop(0)
 
 console_log('Running selentium version: "%s".' % webdriver.__version__)
 
@@ -478,7 +482,7 @@ else:
     if SelectedBrowser:
         browser = os_path.realpath(SelectedBrowser)
     else:
-        console_log("No browser has been setup!\n Exit Code: -1", "error")
+        console_log("No browser has been setup!\nExit Code: -1", "error")
         raise selenium.common.exceptions.WebDriverException()
 
 console_log('Selected browser at system path: "%s"' % browser)
@@ -488,7 +492,7 @@ log = os_path.realpath("..\\.temp")
 if os_path.exists(browser):
     console_log('Located browser at "%s".' % browser)
 else:
-    console_log("Unable to locate browser!\n Exit Code: -1", "error")
+    console_log("Unable to locate browser!\nExit Code: -1", "error")
     raise FileNotFoundError("Unable to locate browser!")
 
 console_log("Attempting to run browser...")
@@ -499,7 +503,7 @@ try:
     console_log("Browser successfully executed!")
 except:
     console_log("Browser window crashed or failed to open!", "error")
-    console_log("Time elapsed: %fs.\n Exit code: -1" % (datetime.now() - time_start).total_seconds())
+    console_log("Time elapsed: %fs.\nExit code: -1" % (datetime.now() - time_start).total_seconds(), "error")
     del time_start
     raise EnvironmentError("Browser has crashed!")
 
@@ -521,4 +525,7 @@ if __name__ == "__main__":
 
 driver.quit()
 console_log("Finished")
-CurrentLog.close()
+try:
+    CurrentLog.close()
+except:
+    pass
