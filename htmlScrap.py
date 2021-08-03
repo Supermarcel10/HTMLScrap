@@ -1,3 +1,5 @@
+import os
+
 import selenium.common.exceptions
 
 from selenium import webdriver
@@ -35,19 +37,19 @@ monthsLong = ["January", "February", "March", "April", "May", "June", "July", "A
 SelectedBrowser = ""
 
 # Options of how the browser is executed.
-browser_options = ChromeOptions()
+BrowserOptions = ChromeOptions()
 
-browser_options.add_argument("--headless")
-browser_options.add_argument("--disable-gpu")
+BrowserOptions.add_argument("--headless")
+BrowserOptions.add_argument("--disable-gpu")
 
 # A set of URLs the program executes and the type of execution..
 URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek"],
         "https://extranet.barnetsouthgate.ac.uk/": ["Past30", "PresentWeek", "Next30"]}
 
-# Setting this value will determine if you use Linux crontab for running your task.
+# Setting this value will determine if you use Linux Crontab for running your task.
 #           True - Disables while loop for grabbing data every set time
 #           False - Enables while loop, that will grab data every set time
-crontab = True
+Crontab = True
 
 # Setting this value will determine if a log file is created for every run.
 FileLogging = True
@@ -70,7 +72,7 @@ loggedElement = {"extranet.barnetsouthgate.ac.uk": None,
 
 # Setting the key to a value will read the key and use it for decryption.
 # If a key is not specified, a key will be asked on every startup.
-# WARNING: SETTING A PERMANENT KEY MAY BE A SAFETY VULNERABILITY!
+# WARNING: SETTING A PERMANENT KEY IS A SAFETY VULNERABILITY!
 key = ""
 
 
@@ -120,9 +122,18 @@ def console_log(message: str = None, mode: str = "info"):
     elif mode == "warn":
         col_message = fg.yellow + "WARN" + fg.white + ": " + col_message
 
-    del now, element, message, string_type
+
     print(fg.white + "[" + col_now + fg.white + "]" + fg.magenta + ": " + col_message)
     del col_now, col_message
+
+    if FileLogging:
+        if mode == "error":
+            CurrentLog.write(f"!!! [{now}] {message}\n")
+        elif mode == "warn":
+            CurrentLog.write(f"??? [{now}] {message}\n")
+        else:
+            CurrentLog.write(f"    [{now}] {message}\n")
+    del now, element, message, string_type
 
 
 def _derive_key(password: bytes, salt: bytes, iterations: int = iterations) -> bytes:
@@ -417,7 +428,7 @@ def isotime():
                                 console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
                         except:
                             console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
-                    except Exception as err:
+                    except Exception:
                         console_log("Failed whilst pulling data!", "warn")
 
                 elif execution.lower().startswith("next"):
@@ -438,6 +449,25 @@ def isotime():
 if len(key) < 1:
     from getpass import getpass
     key = getpass("Key:")
+
+if not os_path.exists("data"):
+    os_mkdir("data")
+
+if not os_path.exists("auth"):
+    os_mkdir("auth")
+
+if FileLogging:
+    if not os_path.exists("logs"):
+        os_mkdir("logs")
+        os_mkdir("logs/fatal")
+
+    now = str(datetime.now().strftime('%m-%d-%Y %Hh %Mm %Ss'))
+
+    open(r"logs/%s.txt" % now, "x")
+    CurrentLog = open(r"logs/%s.txt" % now, "a")
+    # TODO: Enforce limit
+    # TODO: Movement to fatal error storage.
+
 
 console_log('Running selentium version: "%s".' % webdriver.__version__)
 
@@ -461,23 +491,18 @@ else:
     console_log("Unable to locate browser!\n Exit Code: -1", "error")
     raise FileNotFoundError("Unable to locate browser!")
 
-if not os_path.exists("data"):
-    os_mkdir("data")
-
-if not os_path.exists("auth"):
-    os_mkdir("auth")
-
 console_log("Attempting to run browser...")
 
 try:
     time_start = datetime.now()
-    driver = webdriver.Chrome(options=browser_options, executable_path=browser)
+    driver = webdriver.Chrome(options=BrowserOptions, executable_path=browser)
     console_log("Browser successfully executed!")
 except:
     console_log("Browser window crashed or failed to open!", "error")
     console_log("Time elapsed: %fs.\n Exit code: -1" % (datetime.now() - time_start).total_seconds())
     del time_start
     raise EnvironmentError("Browser has crashed!")
+
 try:
     driver.set_page_load_timeout(30)
     console_log("Set page load timeout to 30s.")
@@ -488,12 +513,12 @@ except:
 if __name__ == "__main__":
     isotime()
 
-    while not crontab:
+    while not Crontab:
         if (datetime.now().minute == 0) and (datetime.now().second == 0):
             isotime()
         else:
             sleep(1)
 
-# driver.find_element()
 driver.quit()
 console_log("Finished")
+CurrentLog.close()
