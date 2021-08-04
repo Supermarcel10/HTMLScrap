@@ -1,3 +1,5 @@
+import os.path
+
 import selenium.common.exceptions
 
 from selenium import webdriver
@@ -209,8 +211,7 @@ def open_datafile(datafile: str):
     #         f.write(str(password_encrypt(bytes("password", "utf-8"), key), "utf-8"))
 
     try:
-        print(f"auth\{datafile}.txt")
-        with open(f"auth\{datafile}.txt", mode="r") as f:
+        with open(f"auth/{datafile}.txt", mode="r") as f:
             return f.readlines()
     except FileNotFoundError:
         console_log("Authentication file not found! Continuing...", "warn")
