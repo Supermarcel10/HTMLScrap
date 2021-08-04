@@ -27,7 +27,8 @@ backend = default_backend()
 iterations = 100_000
 monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 monthsLong = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-
+CWD = os_getcwd()
+print(CWD)
 
 # Directory of your browser.
 # Note: Windows is already supported out of box.
@@ -208,6 +209,7 @@ def open_datafile(datafile: str):
     #         f.write(str(password_encrypt(bytes("password", "utf-8"), key), "utf-8"))
 
     try:
+        print(f"auth\{datafile}.txt")
         with open(f"auth\{datafile}.txt", mode="r") as f:
             return f.readlines()
     except FileNotFoundError:
@@ -302,9 +304,6 @@ def longToShortDayName(original):
         return "Sun"
 
 
-# def isotime():
-    # TODO: Open or create datafile
-
 
 def isotime():
     print(URLs)
@@ -314,7 +313,7 @@ def isotime():
 
         try:
             read_csv("data/%s.csv" % fileName)
-            os_rm("data/%s.csv" % fileName) # TODO: Maybe update
+            os_rm("data/%s.csv" % fileName) # TODO: Decide - Either delete the file and recreate it, or read the file and add onto it.
             df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
         except:
             df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
