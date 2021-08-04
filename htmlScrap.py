@@ -1,5 +1,3 @@
-import os.path
-
 import selenium.common.exceptions
 
 from selenium import webdriver
@@ -237,7 +235,8 @@ def locate_login(url: str):
             return authenticate(url, str(password_decrypt(bytes(data[0], "utf-8"), key), "utf-8"))
         except InvalidToken:
             console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
-        except:
+        except Exception as err:
+            print(err)
             console_log("Failed to locate fields for website %s!" % url, "warn")
 
     elif datafile == "extranet.barnetsouthgate.ac.uk":
@@ -307,8 +306,6 @@ def longToShortDayName(original):
 
 
 def isotime():
-    print(URLs)
-
     for url in URLs:
         fileName = locate_datafile(url)
 
@@ -396,16 +393,16 @@ def isotime():
                         weekdays = {}
 
                         for i in range(0, 7):
-                            ending_time = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text
+                            ending_time = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text
 
                             if " " in ending_time:
-                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
                                      ending_time.split(" ")[0],
                                      ending_time.split(" ")[1]]
                             else:
-                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
                                      ending_time,
                                      None]
 
