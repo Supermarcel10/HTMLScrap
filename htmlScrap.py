@@ -237,6 +237,7 @@ def locate_login(url: str):
             console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
         except Exception as err:
             print(err)
+            raise err
             console_log("Failed to locate fields for website %s!" % url, "warn")
 
     elif datafile == "extranet.barnetsouthgate.ac.uk":
@@ -326,119 +327,120 @@ def isotime():
             try:
                 if loggedElement[fileName] is not None:
                     if driver.find_element_by_xpath(loggedElement[fileName]):
-                        continue
+                        pass
             except selenium.common.exceptions.NoSuchElementException:
                 if locate_login(url):
-                    continue
+                    pass
                 else:
                     console_log("Failed to authenticate at %s!" % url, "warn")
-            finally:
-                if execution.lower() == "presentweek":
-                    console_log('Attempting to grab present week for profile "%s".' % titles[fileName])
+                    continue
+
+            if execution.lower() == "presentweek":
+                console_log('Attempting to grab present week for profile "%s".' % titles[fileName])
+
+                try:
+                    console_log("Pulling data...")
+                    _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
+                    if week.endswith(")"): week = week[:-1]
+                    week = week.split(" ", 3)
+
+                    weekdays = {}
+
+                    for i in range(0, 7):
+                        ending_time = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text
+
+                        if " " in ending_time:
+                            weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                 ending_time.split(" ")[0],
+                                 ending_time.split(" ")[1]]
+                        else:
+                            weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                 ending_time,
+                                 None]
+
+                    del ending_time
+                    console_log("Successfully pulled data!")
 
                     try:
-                        console_log("Pulling data...")
-                        _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3').text.split(" - ")
-                        if week.endswith(")"): week = week[:-1]
-                        week = week.split(" ", 3)
+                        console_log("Pushing data.")
 
-                        weekdays = {}
-
-                        for i in range(0, 7):
-                            ending_time = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[3]' % i).text
-
-                            if " " in ending_time:
-                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                                     ending_time.split(" ")[0],
-                                     ending_time.split(" ")[1]]
+                        for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
+                            if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
+                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
                             else:
-                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_ThisWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                                     ending_time,
-                                     None]
+                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
+                                                                       datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
 
-                        del ending_time
-                        console_log("Successfully pulled data!")
+                            df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1], weekdays[day][2], 0]], columns=["title", "date", "start_time",
+                                                                                                                                                   "end_time", "extras", "disabled"]),
+                                           ignore_index=True)
 
-                        try:
-                            console_log("Pushing data.")
-
-                            for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
-                                if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
-                                    date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
-                                else:
-                                    date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
-                                                                           datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
-
-                                df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1], weekdays[day][2], 0]], columns=["title", "date", "start_time",
-                                                                                                                                                       "end_time", "extras", "disabled"]),
-                                               ignore_index=True)
-
-                                console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
-                        except:
-                            console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
+                            console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
                     except:
-                        console_log("Failed whilst pulling data!", "warn")
+                        console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
+                except:
+                    console_log("Failed whilst pulling data!", "warn")
 
-                if execution.lower() == "nextweek":
-                    console_log('Attempting to grab next week for profile "%s".' % titles[fileName])
+            if execution.lower() == "nextweek":
+                console_log('Attempting to grab next week for profile "%s".' % titles[fileName])
+
+                try:
+                    console_log("Pulling data...")
+                    _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
+                    if week.endswith(")"): week = week[:-1]
+                    week = week.split(" ", 3)
+
+                    weekdays = {}
+
+                    for i in range(0, 7):
+                        ending_time = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text
+
+                        if " " in ending_time:
+                            weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                 ending_time.split(" ")[0],
+                                 ending_time.split(" ")[1]]
+                        else:
+                            weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
+                                [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
+                                 ending_time,
+                                 None]
+
+                    del ending_time
+                    console_log("Successfully pulled data!")
 
                     try:
-                        console_log("Pulling data...")
-                        _, week = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekPanel"]/div[1]/div/h3').text.split(" - ")
-                        if week.endswith(")"): week = week[:-1]
-                        week = week.split(" ", 3)
+                        console_log("Pushing data.")
 
-                        weekdays = {}
-
-                        for i in range(0, 7):
-                            ending_time = driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[3]' % i).text
-
-                            if " " in ending_time:
-                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                                     ending_time.split(" ")[0],
-                                     ending_time.split(" ")[1]]
+                        for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
+                            if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
+                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
                             else:
-                                weekdays[driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[1]' % i).text] = \
-                                    [driver.find_element_by_xpath('//*[@id="dnn_ctr454_WorkingHoursView_NextWeekRepeater_weekRow_%i"]/td[2]' % i).text,
-                                     ending_time,
-                                     None]
+                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
+                                                                       datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
 
-                        del ending_time
-                        console_log("Successfully pulled data!")
+                            df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1], weekdays[day][2], 0]], columns=["title", "date", "start_time", "end_time", "extras",
+                                                                                                                              "disabled"]),
+                                           ignore_index=True)
 
-                        try:
-                            console_log("Pushing data.")
+                            console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
+                    except:
+                        console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
+                except Exception:
+                    console_log("Failed whilst pulling data!", "warn")
 
-                            for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
-                                if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
-                                    date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
-                                else:
-                                    date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
-                                                                           datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
+            elif execution.lower().startswith("next"):
+                WeekYear += int(execution[-2:])
+                # TODO: Next Execution type
 
-                                df = df.append(DataFrame([[titles[fileName], date, weekdays[day][0], weekdays[day][1], weekdays[day][2], 0]], columns=["title", "date", "start_time", "end_time", "extras",
-                                                                                                                                  "disabled"]),
-                                               ignore_index=True)
-
-                                console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], titles[fileName]))
-                        except:
-                            console_log("Failed whilst pushing %s data!" % titles[fileName], "warn")
-                    except Exception:
-                        console_log("Failed whilst pulling data!", "warn")
-
-                elif execution.lower().startswith("next"):
-                    WeekYear += int(execution[-2:])
-                    # TODO: Next Execution type
-
-                if execution.lower() == "pastweek":
-                    # TODO: Past week Execution type
-                    WeekYear -= 1
-                elif execution.lower().startswith("past"):
-                    # TODO: Past weeks Execution types
-                    WeekYear -= int(execution[-2:])
+            if execution.lower() == "pastweek":
+                # TODO: Past week Execution type
+                WeekYear -= 1
+            elif execution.lower().startswith("past"):
+                # TODO: Past weeks Execution types
+                WeekYear -= int(execution[-2:])
 
         df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="---")
 
