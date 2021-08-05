@@ -220,7 +220,7 @@ def open_datafile(datafile: str):
                 f.write(str(password_encrypt(bytes(input("Username: "), "utf-8"), key), "utf-8"))
                 f.write("\n")
                 f.write(str(password_encrypt(bytes(getpass("Password: "), "utf-8"), key), "utf-8"))
-                f.flush()
+            with open(f"auth/{datafile}.txt", mode="r") as f:
                 return f.readlines()
         return
 
