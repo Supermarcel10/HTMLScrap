@@ -64,10 +64,16 @@ titles = {
     "*": "other"
 }
 
-# Set this value to the xpath of where the data is pulled from
+# Set this value to the xpath of where the login data is inserted
 loggedElement = {"extranet.barnetsouthgate.ac.uk": None,
                  "memployees.sportsdirectservices.com": '//*[@id="dnn_ctr454_ModuleContent"]/div/div[1]/div/h3'
                  }
+
+# Set this value to toggle the creation of auth files.
+# Default: False
+# False - Disable auth generation if no file is located (recommended)
+# True - Prompt the user to input a username and password, which will be stored for auth.
+AllowAuthCreator = False
 
 # Setting the key to a value will read the key and use it for decryption.
 # If a key is not specified, a key will be asked on every startup.
@@ -202,17 +208,18 @@ def locate_datafile(url: str) -> str:
 
 # TODO: Make datafile creator
 def open_datafile(datafile: str):
-    # if datafile.startswith("extranet"):
-    #     with open(f"auth\{datafile}.txt", mode="w") as f:
-    #         f.write(str(password_encrypt(bytes("username", "utf-8"), key), "utf-8"))
-    #         f.write("\n")
-    #         f.write(str(password_encrypt(bytes("password", "utf-8"), key), "utf-8"))
-
     try:
         with open(f"auth/{datafile}.txt", mode="r") as f:
             return f.readlines()
     except FileNotFoundError:
-        console_log("Authentication file not found! Continuing...", "warn")
+        console_log("Authentication file not found! First time setup initiated...", "warn")
+        if AllowAuthCreator:
+            with open(f"auth/{datafile}.txt", mode="x") as f:
+                f.write(str(password_encrypt(bytes(input("Username: "), "utf-8"), key), "utf-8"))
+                f.write("\n")
+                from getpass import getpass
+                f.write(str(password_encrypt(bytes(getpass("Password: "), "utf-8"), key), "utf-8"))
+                return f.readlines()
         return
 
 
@@ -445,17 +452,6 @@ def isotime():
         df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="---")
 
 
-
-if len(key) < 1:
-    from getpass import getpass
-    key = getpass("Key:")
-
-if not os_path.exists("data"):
-    os_mkdir("data")
-
-if not os_path.exists("auth"):
-    os_mkdir("auth")
-
 if FileLogging:
     if not os_path.exists("logs"):
         os_mkdir("logs")
@@ -471,6 +467,19 @@ if FileLogging:
             while len(files[2]) > FileLogHistory - 1:
                 os_rm(min(["logs/{0}".format(f) for f in files[2]], key=os_path.getctime))
                 files[2].pop(0)
+
+if len(key) < 1:
+    from getpass import getpass
+    key = getpass("Key:")
+
+if not os_path.exists("data"):
+    os_mkdir("data")
+
+if not os_path.exists("auth"):
+    os_mkdir("auth")
+    AllowAuthCreator = True
+    console_log("Enabling first time setup. Creation of authentication files enabled.", "warn")
+
 
 console_log('Running selentium version: "%s".' % webdriver.__version__)
 
