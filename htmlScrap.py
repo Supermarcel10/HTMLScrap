@@ -73,7 +73,7 @@ loggedElement = {"extranet.barnetsouthgate.ac.uk": None,
 # Default: False
 # False - Disable auth generation if no file is located (recommended)
 # True - Prompt the user to input a username and password, which will be stored for auth.
-AllowAuthCreator = False
+AllowAuthCreator = True
 
 # Setting the key to a value will read the key and use it for decryption.
 # If a key is not specified, a key will be asked on every startup.
@@ -212,13 +212,15 @@ def open_datafile(datafile: str):
         with open(f"auth/{datafile}.txt", mode="r") as f:
             return f.readlines()
     except FileNotFoundError:
-        console_log("Authentication file not found! First time setup initiated...", "warn")
+        console_log("Authentication file not found!", "warn")
         if AllowAuthCreator:
-            with open(f"auth/{datafile}.txt", mode="x") as f:
+            console_log("First time setup initiated...", "warn")
+            from getpass import getpass
+            with open(f"auth/{datafile}.txt", mode="x+") as f:
                 f.write(str(password_encrypt(bytes(input("Username: "), "utf-8"), key), "utf-8"))
                 f.write("\n")
-                from getpass import getpass
                 f.write(str(password_encrypt(bytes(getpass("Password: "), "utf-8"), key), "utf-8"))
+                f.flush()
                 return f.readlines()
         return
 
@@ -242,9 +244,7 @@ def locate_login(url: str):
             return authenticate(url, str(password_decrypt(bytes(data[0], "utf-8"), key), "utf-8"))
         except InvalidToken:
             console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
-        except Exception as err:
-            print(err)
-            raise err
+        except:
             console_log("Failed to locate fields for website %s!" % url, "warn")
 
     elif datafile == "extranet.barnetsouthgate.ac.uk":
@@ -279,6 +279,7 @@ def authenticate(url: str, username: str):
 
 
 def shortToLongDayName(original):
+    original = original.lower()
     if original == "mon":
         return "Monday"
     elif original == "tue":
@@ -296,6 +297,7 @@ def shortToLongDayName(original):
 
 
 def longToShortDayName(original):
+    original = original.lower()
     if original == "monday":
         return "Mon"
     elif original == "tuesday":
