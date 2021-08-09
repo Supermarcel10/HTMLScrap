@@ -1,5 +1,4 @@
-import selenium.common.exceptions
-
+from selenium.common.exceptions import WebDriverException as WebDriverException, NoSuchElementException as NoSuchElementException
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.support.ui import WebDriverWait
@@ -18,7 +17,7 @@ from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove a
 from pandas import DataFrame, read_csv
 from sty import fg
 from time import sleep
-from datetime import datetime, timedelta
+from datetime import datetime
 from calendar import monthrange
 from secrets import token_bytes
 from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
@@ -47,7 +46,7 @@ URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWee
 # Setting this value will determine if you use Linux Crontab for running your task.
 #           True - Disables while loop for grabbing data every set time
 #           False - Enables while loop, that will grab data every set time
-Crontab = True
+Crontab = False
 
 # Setting this value will determine if a log file is created for every run.
 FileLogging = True
@@ -73,7 +72,7 @@ loggedElement = {"extranet.barnetsouthgate.ac.uk": None,
 # Default: False
 # False - Disable auth generation if no file is located (recommended)
 # True - Prompt the user to input a username and password, which will be stored for auth.
-AllowAuthCreator = True
+AllowAuthCreator = False
 
 # Setting the key to a value will read the key and use it for decryption.
 # If a key is not specified, a key will be asked on every startup.
@@ -337,7 +336,7 @@ def isotime():
                 if loggedElement[fileName] is not None:
                     if driver.find_element_by_xpath(loggedElement[fileName]):
                         pass
-            except selenium.common.exceptions.NoSuchElementException:
+            except NoSuchElementException:
                 if locate_login(url):
                     pass
                 else:
@@ -451,7 +450,7 @@ def isotime():
                 # TODO: Past weeks Execution types
                 WeekYear -= int(execution[-2:])
 
-        df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="---")
+        df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="-")
 
 
 if FileLogging:
@@ -493,7 +492,7 @@ else:
         browser = os_path.realpath(SelectedBrowser)
     else:
         console_log("No browser has been setup!\nExit Code: -1", "error")
-        raise selenium.common.exceptions.WebDriverException()
+        raise WebDriverException()
 
 console_log('Selected browser at system path: "%s"' % browser)
 
