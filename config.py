@@ -10,6 +10,8 @@ BrowserOptions = ChromeOptions()
 BrowserOptions.add_argument("--headless")
 BrowserOptions.add_argument("--disable-gpu")
 
+BrowserLoadTimeout = 30
+
 # A set of URLs the program executes and the type of execution..
 URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWeek", "NextWeek"],
         "https://extranet.barnetsouthgate.ac.uk/": ["Past30", "PresentWeek", "Next30"]}
@@ -17,7 +19,7 @@ URLs = {"http://memployees.sportsdirectservices.com/Working-Hours": ["PresentWee
 # Setting this value will determine if you use Linux Crontab for running your task.
 #           True - Disables while loop for grabbing data every set time
 #           False - Enables while loop, that will grab data every set time
-Crontab = False
+Crontab = True
 
 # Setting this value will determine if a log file is created for every run.
 FileLogging = True

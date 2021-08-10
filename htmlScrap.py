@@ -4,31 +4,59 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 
-from cryptography.fernet import Fernet
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.fernet import InvalidToken
 
+from time import sleep
 from platform import system as sysplatform
 from itertools import zip_longest
 from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove as os_rm, replace as os_move, walk as os_search
 from pandas import DataFrame, read_csv
 from sty import fg
-from time import sleep
-from datetime import datetime
 from calendar import monthrange
-from secrets import token_bytes
-from base64 import urlsafe_b64encode as b64e, urlsafe_b64decode as b64d
+from datetime import datetime
 
-backend = default_backend()
-iterations = 100_000
+import authentication
+import config
+
 monthsShort = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 monthsLong = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-CWD = os_getcwd()
-print(CWD)
 
-import config
+
+def shortToLongDayName(original):
+    original = original.lower()
+    if original == "mon":
+        return "Monday"
+    elif original == "tue":
+        return "Tuesday"
+    elif original == "wed":
+        return "Wednesday"
+    elif original == "thu":
+        return "Thursday"
+    elif original == "fri":
+        return "Friday"
+    elif original == "sat":
+        return "Saturday"
+    elif original == "sun":
+        return "Sunday"
+
+
+def longToShortDayName(original):
+    original = original.lower()
+    if original == "monday":
+        return "Mon"
+    elif original == "tuesday":
+        return "Tue"
+    elif original == "wednesday":
+        return "Wed"
+    elif original == "thursday":
+        return "Thu"
+    elif original == "friday":
+        return "Fri"
+    elif original == "saturday":
+        return "Sat"
+    elif original == "sunday":
+        return "Sun"
+
 
 def console_log(message: str = None, mode: str = "info"):
     now = str(datetime.now())
@@ -92,41 +120,14 @@ def console_log(message: str = None, mode: str = "info"):
     del now, element, message, string_type
 
 
-def _derive_key(password: bytes, salt: bytes, iterations: int = iterations) -> bytes:
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(), length=32, salt=salt,
-        iterations=iterations, backend=backend)
-    return b64e(kdf.derive(password))
-
-
-def password_encrypt(password: bytes, key: str, iterations: int = iterations) -> bytes:
-    salt = token_bytes(16)
-    key = _derive_key(key.encode(), salt, iterations)
-    return b64e(
-        b'%b%b%b' % (
-            salt,
-            iterations.to_bytes(4, 'big'),
-            b64d(Fernet(key).encrypt(password)),
-        )
-    )
-
-
-def password_decrypt(token: bytes, key: str) -> bytes:
-    decoded = b64d(token)
-    salt, iter, token = decoded[:16], decoded[16:20], b64e(decoded[20:])
-    iterations = int.from_bytes(iter, 'big')
-    key = _derive_key(key.encode(), salt, iterations)
-    return Fernet(key).decrypt(token)
-
-
 def ping(url: str, silent: bool = False):
     if silent:
         console_log("Attempting to ping website...")
     else:
         console_log("Attempting to ping %s..." % url)
 
+    time_load_start = datetime.now()
     try:
-        time_load_start = datetime.now()
         driver.get(url)
 
         if silent:
@@ -150,11 +151,12 @@ def locate_datafile(url: str) -> str:
     elif url.startswith("http://"):
         datafile = url[7:]
 
-    datafile, _ = datafile.split("/", 1)
-    return datafile
+    try:
+        return datafile.split("/", 1)[0]
+    except:
+        return
 
 
-# TODO: Make datafile creator
 def open_datafile(datafile: str):
     try:
         with open(f"auth/{datafile}.txt", mode="r") as f:
@@ -165,9 +167,9 @@ def open_datafile(datafile: str):
             console_log("First time setup initiated...", "warn")
             from getpass import getpass
             with open(f"auth/{datafile}.txt", mode="x+") as f:
-                f.write(str(password_encrypt(bytes(input("Username: "), "utf-8"), config.key), "utf-8"))
+                f.write(str(authentication.encrypt(bytes(input("Username: "), "utf-8"), config.key), "utf-8"))
                 f.write("\n")
-                f.write(str(password_encrypt(bytes(getpass("Password: "), "utf-8"), config.key), "utf-8"))
+                f.write(str(authentication.encrypt(bytes(getpass("Password: "), "utf-8"), config.key), "utf-8"))
             with open(f"auth/{datafile}.txt", mode="r") as f:
                 return f.readlines()
         return
@@ -184,12 +186,12 @@ def locate_login(url: str):
     # TODO: Redo in the form of an option menu.
     if datafile == "memployees.sportsdirectservices.com":
         try:
-            driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtUsername").send_keys(str(password_decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"))
-            driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtPassword").send_keys(str(password_decrypt(bytes(data[1], "utf-8"), config.key), "utf-8"))
+            driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtUsername").send_keys(str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"))
+            driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtPassword").send_keys(str(authentication.decrypt(bytes(data[1], "utf-8"), config.key), "utf-8"))
 
             console_log("Successfully located fields!")
 
-            return authenticate(url, str(password_decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"))
+            return authenticate(url, str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"))
         except InvalidToken:
             console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
         except:
@@ -202,8 +204,8 @@ def locate_login(url: str):
             if week_num > 52:
                 return False
 
-            ping(f"https://%s:%s@extranet.barnetsouthgate.ac.uk/registers/timetable/user/week/{week_num}" % (str(password_decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"),
-                                                                                                                  str(password_decrypt(bytes(data[1], "utf-8"), config.key), "utf-8")), True)
+            ping(f"https://%s:%s@extranet.barnetsouthgate.ac.uk/registers/timetable/user/week/{week_num}" % (str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"),
+                                                                                                                  str(authentication.decrypt(bytes(data[1], "utf-8"), config.key), "utf-8")), True)
             return True
         except InvalidToken:
             console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
@@ -224,43 +226,6 @@ def authenticate(url: str, username: str):
         return True
     except:
         console_log('Login information for user "%s" on website %s may be incorrect!' % (username, url), "warn")
-
-
-def shortToLongDayName(original):
-    original = original.lower()
-    if original == "mon":
-        return "Monday"
-    elif original == "tue":
-        return "Tuesday"
-    elif original == "wed":
-        return "Wednesday"
-    elif original == "thu":
-        return "Thursday"
-    elif original == "fri":
-        return "Friday"
-    elif original == "sat":
-        return "Saturday"
-    elif original == "sun":
-        return "Sunday"
-
-
-def longToShortDayName(original):
-    original = original.lower()
-    if original == "monday":
-        return "Mon"
-    elif original == "tuesday":
-        return "Tue"
-    elif original == "wednesday":
-        return "Wed"
-    elif original == "thursday":
-        return "Thu"
-    elif original == "friday":
-        return "Fri"
-    elif original == "saturday":
-        return "Sat"
-    elif original == "sunday":
-        return "Sun"
-
 
 
 def isotime():
@@ -402,77 +367,82 @@ def isotime():
         df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="-")
 
 
-if config.FileLogging:
-    if not os_path.exists("logs"):
-        os_mkdir("logs")
-        os_mkdir("logs/fatal")
-
-    CurrentLogName = str(datetime.now().strftime('%m-%d-%Y %H%M%S'))
-
-    open(r"logs/%s.log" % CurrentLogName, "x")
-    CurrentLog = open(r"logs/%s.log" % CurrentLogName, "a")
-
-    if config.FileLogLimit:
-        for files in os_search(r"logs/"):
-            while len(files[2]) > config.FileLogHistory - 1:
-                os_rm(min(["logs/{0}".format(f) for f in files[2]], key=os_path.getctime))
-                files[2].pop(0)
-
-if len(config.key) < 1:
-    from getpass import getpass
-    config.key = getpass("Key:")
-
-if not os_path.exists("data"):
-    os_mkdir("data")
-
-if not os_path.exists("auth"):
-    os_mkdir("auth")
-    config.AllowAuthCreator = True
-    console_log("Enabling first time setup. Creation of authentication files enabled.", "warn")
-
-
-console_log('Running selentium version: "%s".' % webdriver.__version__)
-
-
-if sysplatform() == "Windows":
-    browser = os_path.realpath(os_getcwd() + "/chromedriver.exe")
-else:
-    if config.SelectedBrowser:
-        browser = os_path.realpath(config.SelectedBrowser)
-    else:
-        console_log("No browser has been setup!\nExit Code: -1", "error")
-        raise WebDriverException()
-
-console_log('Selected browser at system path: "%s"' % browser)
-
-log = os_path.realpath("..\\.temp")
-
-if os_path.exists(browser):
-    console_log('Located browser at "%s".' % browser)
-else:
-    console_log("Unable to locate browser!\nExit Code: -1", "error")
-    raise FileNotFoundError("Unable to locate browser!")
-
-console_log("Attempting to run browser...")
-
-try:
-    time_start = datetime.now()
-    driver = webdriver.Chrome(options=config.BrowserOptions, executable_path=browser)
-    console_log("Browser successfully executed!")
-except:
-    console_log("Browser window crashed or failed to open!", "error")
-    console_log("Time elapsed: %fs.\nExit code: -1" % (datetime.now() - time_start).total_seconds(), "error")
-    del time_start
-    raise EnvironmentError("Browser has crashed!")
-
-try:
-    driver.set_page_load_timeout(30)
-    console_log("Set page load timeout to 30s.")
-except:
-    console_log("Failed to set page load timeout!", "warn")
-
-
 if __name__ == "__main__":
+    # CWD = os_getcwd()
+    # print(CWD)
+
+    # Startup
+
+    if config.FileLogging:
+        if not os_path.exists("logs"):
+            os_mkdir("logs")
+            os_mkdir("logs/fatal")
+
+        CurrentLogName = str(datetime.now().strftime('%m-%d-%Y %H%M%S'))
+
+        open(r"logs/%s.log" % CurrentLogName, "x")
+        CurrentLog = open(r"logs/%s.log" % CurrentLogName, "a")
+
+        if config.FileLogLimit:
+            for files in os_search(r"logs/"):
+                while len(files[2]) > config.FileLogHistory - 1:
+                    os_rm(min(["logs/{0}".format(f) for f in files[2]], key=os_path.getctime))
+                    files[2].pop(0)
+
+    if len(config.key) < 1:
+        from getpass import getpass
+
+        config.key = getpass("Key:")
+
+    if not os_path.exists("data"):
+        os_mkdir("data")
+
+    if not os_path.exists("auth"):
+        os_mkdir("auth")
+        config.AllowAuthCreator = True
+        console_log("Enabling first time setup. Creation of authentication files enabled.", "warn")
+
+    console_log('Running selentium version: "%s".' % webdriver.__version__)
+
+    if sysplatform() == "Windows":
+        browser = os_path.realpath(os_getcwd() + "/chromedriver.exe")
+    else:
+        if config.SelectedBrowser:
+            browser = os_path.realpath(config.SelectedBrowser)
+        else:
+            console_log("No browser has been setup!\nExit Code: -1", "error")
+            raise WebDriverException()
+
+    console_log('Selected browser at system path: "%s"' % browser)
+
+    log = os_path.realpath("..\\.temp")
+
+    if os_path.exists(browser):
+        console_log('Located browser at "%s".' % browser)
+    else:
+        console_log("Unable to locate browser!\nExit Code: -1", "error")
+        raise FileNotFoundError("Unable to locate browser!")
+
+    console_log("Attempting to run browser...")
+
+    time_start = datetime.now()
+    try:
+        driver = webdriver.Chrome(options=config.BrowserOptions, executable_path=browser)
+        console_log("Browser successfully executed!")
+    except:
+        console_log("Browser window crashed or failed to open!", "error")
+        console_log("Time elapsed: %fs.\nExit code: -1" % (datetime.now() - time_start).total_seconds(), "error")
+        del time_start
+        raise EnvironmentError("Browser has crashed!")
+
+    try:
+        driver.set_page_load_timeout(config.BrowserLoadTimeout)
+        console_log(f"Set page load timeout to {config.BrowserLoadTimeout}s.")
+    except:
+        console_log("Failed to set page load timeout!", "warn")
+
+    # Execution
+
     isotime()
 
     while not config.Crontab:
@@ -480,10 +450,13 @@ if __name__ == "__main__":
             isotime()
         else:
             sleep(1)
+    
+    # Exit
 
-driver.quit()
-console_log("Finished")
-try:
-    CurrentLog.close()
-except:
-    pass
+    driver.quit()
+    console_log("Finished")
+    try:
+        del CurrentLog
+        CurrentLog.close()
+    except NameError:
+        pass
