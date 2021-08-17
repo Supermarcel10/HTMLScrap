@@ -232,12 +232,20 @@ def isotime():
     for url in config.URLs:
         fileName = locate_datafile(url)
 
+        # try:
+        #     read_csv("data/%s.csv" % fileName)
+        #     os_rm("data/%s.csv" % fileName) # TODO: Decide - Either delete the file and recreate it, or read the file and add onto it.
+        #     df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
+        # except:
+        #     df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
+
         try:
-            read_csv("data/%s.csv" % fileName)
-            os_rm("data/%s.csv" % fileName) # TODO: Decide - Either delete the file and recreate it, or read the file and add onto it.
-            df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
+            read_csv(f"data/{fileName}.csv")
+            os_move(f"data/{fileName}.csv", f"data/{fileName}.old.csv")
         except:
-            df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
+            console_log("Did not find old file. Ignoring...", "warn")
+
+        df = DataFrame(columns=["title", "date", "start_time", "end_time", "extras", "disabled"])
 
         for execution in config.URLs[url]:
             """Execution types: PRESENTWEEK, NEXTWEEK, PASTWEEK, NEXT30 (next 30 weeks) or PAST30 (past 30 weeks)."""
