@@ -1,3 +1,6 @@
+import requirementChk
+requirementChk.__main__()
+
 from selenium.common.exceptions import WebDriverException as WebDriverException, NoSuchElementException as NoSuchElementException
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
@@ -5,12 +8,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 
 from cryptography.fernet import InvalidToken
+from cryptography import __version__ as CryptVer
 
 from time import sleep
 from platform import system as sysplatform
 from itertools import zip_longest
 from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove as os_rm, replace as os_move, walk as os_search
-from pandas import DataFrame, read_csv
+from pandas import DataFrame, read_csv, __version__ as PandasVer
 from sty import fg
 from calendar import monthrange
 from datetime import datetime
@@ -411,6 +415,8 @@ if __name__ == "__main__":
         console_log("Enabling first time setup. Creation of authentication files enabled.", "warn")
 
     console_log('Running selentium version: "%s".' % webdriver.__version__)
+    console_log('Running cryptography version: "%s".' % CryptVer)
+    console_log('Running pandas version: "%s".' % PandasVer)
 
     if sysplatform() == "Windows":
         browser = os_path.realpath(os_getcwd() + "/chromedriver.exe")
@@ -434,12 +440,13 @@ if __name__ == "__main__":
     console_log("Attempting to run browser...")
 
     time_start = datetime.now()
+
     try:
         driver = webdriver.Chrome(options=config.BrowserOptions, executable_path=browser)
         console_log("Browser successfully executed!")
-    except:
-        console_log("Browser window crashed or failed to open!", "error")
-        console_log("Time elapsed: %fs.\nExit code: -1" % (datetime.now() - time_start).total_seconds(), "error")
+    except WebDriverException as err:
+        console_log(str(err), "warn")
+        console_log("Browser window crashed or failed to open!\nTime elapsed: %fs.\nExit code: -1" % (datetime.now() - time_start).total_seconds(), "error")
         del time_start
         raise EnvironmentError("Browser has crashed!")
 
