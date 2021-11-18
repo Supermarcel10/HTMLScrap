@@ -36,12 +36,12 @@ CombinedDatafileName = "data"
 # You may need to run the main python script as an escalated user in order to access specified location.
 # Leave empty "[]" to disable saving.
 # [Default: <empty>]
-SaveLocation = ["C:/"]
+SaveLocation = []
 # SaveLocation = ["/NETSHARE/General"]
 
 # Setting this value will determine what data is saved with the cloned files.
 # Available options: logs, data
-# [Default: "data"] # TODO: Add log data saving
+# [Default: "data"]
 SavedInformation = ["data", "logs"]
 
 # Setting this value will determine if a log file is created for every run.
