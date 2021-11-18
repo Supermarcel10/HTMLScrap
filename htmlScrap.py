@@ -1,3 +1,5 @@
+import os.path
+
 import requirementChk
 requirementChk.__main__()
 
@@ -14,6 +16,8 @@ from time import sleep
 from platform import system as sysplatform
 from itertools import zip_longest
 from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove as os_rm, replace as os_move, walk as os_search
+from pathlib import Path as os_fullpath
+from shutil import copy as os_cp
 from pandas import DataFrame, read_csv, __version__ as PandasVer
 from sty import fg
 from calendar import monthrange
@@ -179,7 +183,7 @@ def open_datafile(datafile: str):
         return
 
 
-def locate_login(url: str):
+def authenticate(url: str):
     console_log("Locating fields...")
 
     datafile = locate_datafile(url)
@@ -187,49 +191,48 @@ def locate_login(url: str):
 
     if not data:
         return
-    # TODO: Redo in the form of an option menu.
-    if datafile == "memployees.sportsdirectservices.com":
+
+    console_log("Attempting authentication...")
+
+    # USR
+    for inputtype in ("username", "email", "text"):
         try:
-            driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtUsername").send_keys(str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"))
-            driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_txtPassword").send_keys(str(authentication.decrypt(bytes(data[1], "utf-8"), config.key), "utf-8"))
+            driver.find_element_by_css_selector(f"input[type={inputtype}]").send_keys(str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"))
+            break
+        except NoSuchElementException:
+            pass
 
-            console_log("Successfully located fields!")
+    # PASS
+    driver.find_element_by_css_selector("input[type='password']").send_keys(str(authentication.decrypt(bytes(data[1], "utf-8"), config.key), "utf-8"))
 
-            return authenticate(url, str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"))
-        except InvalidToken:
-            console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
-        except:
-            console_log("Failed to locate fields for website %s!" % url, "warn")
-
-    elif datafile == "extranet.barnetsouthgate.ac.uk":
-        try:
-            _, week_num, _ = datetime.today().isocalendar()
-            week_num += 22
-            if week_num > 52:
-                return False
-
-            ping(f"https://%s:%s@extranet.barnetsouthgate.ac.uk/registers/timetable/user/week/{week_num}" % (str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"),
-                                                                                                                  str(authentication.decrypt(bytes(data[1], "utf-8"), config.key), "utf-8")), True)
-            return True
-        except InvalidToken:
-            console_log("Cryptography key for authentication is invalid! Continuing...", "warn")
-            return False
-        except:
-            console_log("Failed to login to website %s!" % url, "warn")
-            return False
-
-
-def authenticate(url: str, username: str):
+    # LOG IN
     try:
-        console_log("Attempting authentication...")
+        driver.find_element_by_css_selector("input[type = 'submit']").click()
+    except NoSuchElementException:
+        pass
 
-        driver.find_element_by_id("dnn_ctr462_Login_Login_DNN_cmdLogin").click()
-        WebDriverWait(driver, 1).until(EC.presence_of_element_located((By.ID, 'dnn_ctr454_ModuleContent')))
+    for inputtype in (
+    "a[title='Login']", "a[title='login']", "a[title='Log in']", "a[title='log in']", "a[title='Submit']",
+    "a[title='submit']"):
+        try:
+            for e in driver.find_elements_by_css_selector(inputtype):
+                if "http" not in e.get_attribute("href"):
+                    e.click()
+                    working_element = e
+                    break
+        except NoSuchElementException:
+            pass
 
-        console_log("Authenticated at %s as %s!" % (url, username))
+    new_page = driver.find_element_by_tag_name("html")
+
+    try:
+        driver.find_element_by_css_selector("input[type='password']")
+
+        console_log('Login information for user "%s" on website %s may be incorrect!' % (str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"), url), "warn")
+        return False
+    except NoSuchElementException:
+        console_log('Authenticated at %s as "%s"!' % (url, str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8")))
         return True
-    except:
-        console_log('Login information for user "%s" on website %s may be incorrect!' % (username, url), "warn")
 
 
 def isotime():
@@ -262,14 +265,17 @@ def isotime():
                 if config.loggedElement[fileName] is not None:
                     if driver.find_element_by_xpath(config.loggedElement[fileName]):
                         pass
+            except KeyError:
+                console_log("Incorrect logging element specified.", "warn")
+                continue
             except NoSuchElementException:
-                if locate_login(url):
+                if authenticate(url):
                     pass
                 else:
                     console_log("Failed to authenticate at %s!" % url, "warn")
                     continue
 
-            if execution.lower() == "presentweek":
+            if execution.lower() == "presentweek": # TODO: REDO COMPLETELY AGAIN
                 console_log('Attempting to grab present week for profile "%s".' % config.titles[fileName])
 
                 try:
@@ -298,17 +304,16 @@ def isotime():
                     console_log("Successfully pulled data!")
 
                     try:
-                        console_log("Pushing data.")
+                        console_log("Pushing data...")
 
                         for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
                             if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
                                 date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel), week[1], week[2]), "%d %b %Y")
                             else:
-                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1],
-                                                                       datetime.strptime(week[1], "%b").month + 1, week[2]), "%d %m %Y")
+                                date = datetime.strptime("%s %s %s" % ((int(week[0]) + rel) - monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1], datetime.strptime(week[1], "%b").month + 1,
+                                                                       week[2]), "%d %m %Y")
 
-                            df = df.append(DataFrame([[config.titles[fileName], date, weekdays[day][0], weekdays[day][1], weekdays[day][2], 0]], columns=["title", "date", "start_time",
-                                                                                                                                                   "end_time", "extras", "disabled"]),
+                            df = df.append(DataFrame([[config.titles[fileName], date, weekdays[day][0], weekdays[day][1], weekdays[day][2], 0]], columns=["title", "date", "start_time", "end_time", "extras", "disabled"]),
                                            ignore_index=True)
 
                             console_log('Successfully pushed "%s" for "%s"!' % ([date.year, date.month, date.day], config.titles[fileName]))
@@ -346,7 +351,7 @@ def isotime():
                     console_log("Successfully pulled data!")
 
                     try:
-                        console_log("Pushing data.")
+                        console_log("Pushing data...")
 
                         for (day, rel) in zip_longest(weekdays, range(len(weekdays))):
                             if monthrange(int(week[2]), int(datetime.strptime(week[1], "%b").month))[1] >= int(week[0]) + rel:
@@ -376,8 +381,21 @@ def isotime():
                 # TODO: Past weeks Execution types
                 WeekYear -= int(execution[-2:])
 
-        df.to_csv("data/%s.csv" % fileName, index=False, sep=";", na_rep="-")
+        df.to_csv(f"data/{fileName}.csv", index=False, sep=";", na_rep="-")
 
+        if len(config.SaveLocation) > 0:
+            for sl in config.SaveLocation:
+                sl_loc = sl + "/HTMLScrap/"
+
+                os_fullpath(sl_loc).mkdir(parents=True,  exist_ok=True)
+
+                # if "logs" in config.SavedInformation:
+                #     TODO: FIX LOG COPY, MOVE TO END WRAP
+                if "data" in config.SavedInformation:
+                    try:
+                        os_cp(f"data/{fileName}.csv", sl_loc)
+                    except FileNotFoundError:
+                        console_log(f'Could not copy data file "{fileName}.csv" to "{sl_loc}"!', "warn")
 
 if __name__ == "__main__":
     # CWD = os_getcwd()
@@ -386,9 +404,7 @@ if __name__ == "__main__":
     # Startup
 
     if config.FileLogging:
-        if not os_path.exists("logs"):
-            os_mkdir("logs")
-            os_mkdir("logs/fatal")
+        os_fullpath("logs/fatal").mkdir(parents=True, exist_ok=True)
 
         CurrentLogName = str(datetime.now().strftime('%m-%d-%Y %H%M%S'))
 
@@ -406,13 +422,12 @@ if __name__ == "__main__":
 
         config.key = getpass("Key:")
 
-    if not os_path.exists("data"):
-        os_mkdir("data")
+    os_fullpath("data").mkdir(parents=True, exist_ok=True)
 
     if not os_path.exists("auth"):
         os_mkdir("auth")
         config.AllowAuthCreator = True
-        console_log("Enabling first time setup. Creation of authentication files enabled.", "warn")
+        console_log("Enabling first time setup. Automatic creation of authentication files enabled.", "warn")
 
     console_log('Running selentium version: "%s".' % webdriver.__version__)
     console_log('Running cryptography version: "%s".' % CryptVer)
