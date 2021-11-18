@@ -17,7 +17,7 @@ from platform import system as sysplatform
 from itertools import zip_longest
 from os import path as os_path, mkdir as os_mkdir, getcwd as os_getcwd, remove as os_rm, replace as os_move, walk as os_search
 from pathlib import Path as os_fullpath
-from shutil import copy as os_cp
+from shutil import copy as os_cp, copytree as os_dircp
 from pandas import DataFrame, read_csv, __version__ as PandasVer
 from sty import fg
 from calendar import monthrange
@@ -203,7 +203,10 @@ def authenticate(url: str):
             pass
 
     # PASS
-    driver.find_element_by_css_selector("input[type='password']").send_keys(str(authentication.decrypt(bytes(data[1], "utf-8"), config.key), "utf-8"))
+    try:
+        driver.find_element_by_css_selector("input[type='password']").send_keys(str(authentication.decrypt(bytes(data[1], "utf-8"), config.key), "utf-8"))
+    except NoSuchElementException:
+        pass
 
     # LOG IN
     try:
@@ -211,9 +214,7 @@ def authenticate(url: str):
     except NoSuchElementException:
         pass
 
-    for inputtype in (
-    "a[title='Login']", "a[title='login']", "a[title='Log in']", "a[title='log in']", "a[title='Submit']",
-    "a[title='submit']"):
+    for inputtype in ("a[title='Login']", "a[title='login']", "a[title='Log in']", "a[title='log in']", "a[title='Submit']", "a[title='submit']"):
         try:
             for e in driver.find_elements_by_css_selector(inputtype):
                 if "http" not in e.get_attribute("href"):
@@ -223,11 +224,9 @@ def authenticate(url: str):
         except NoSuchElementException:
             pass
 
-    new_page = driver.find_element_by_tag_name("html")
-
     try:
         driver.find_element_by_css_selector("input[type='password']")
-
+        # TODO: BUG - Sometimes clunky and may recognise as not logged in
         console_log('Login information for user "%s" on website %s may be incorrect!' % (str(authentication.decrypt(bytes(data[0], "utf-8"), config.key), "utf-8"), url), "warn")
         return False
     except NoSuchElementException:
@@ -389,8 +388,6 @@ def isotime():
 
                 os_fullpath(sl_loc).mkdir(parents=True,  exist_ok=True)
 
-                # if "logs" in config.SavedInformation:
-                #     TODO: FIX LOG COPY, MOVE TO END WRAP
                 if "data" in config.SavedInformation:
                     try:
                         os_cp(f"data/{fileName}.csv", sl_loc)
@@ -490,3 +487,15 @@ if __name__ == "__main__":
         CurrentLog.close()
     except NameError:
         pass
+
+    if len(config.SaveLocation) > 0:
+        if "logs" in config.SavedInformation:
+            for sl in config.SaveLocation:
+                sl_loc = sl + "/HTMLScrap/logs/"
+                os_fullpath(sl_loc).mkdir(parents=True, exist_ok=True)
+
+                os_dircp("logs", sl_loc, dirs_exist_ok=True)
+
+            # try:
+            # except FileNotFoundError:
+            #     console_log(f'Could not copy data file "{fileName}.csv" to "{sl_loc}"!', "warn")
